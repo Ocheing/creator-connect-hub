@@ -11,24 +11,24 @@ const Footer = () => {
       { label: "About Us", href: "/about" },
       { label: "Services", href: "/services" },
       { label: "Blog", href: "/blog" },
-      { label: "Careers", href: "#" },
+      { label: "Contact", href: "/for-brands" },
     ],
     forCreators: [
       { label: "Join as Influencer", href: "/for-influencers" },
-      { label: "Rate Card Template", href: "#" },
+      { label: "Rate Card Template", href: "/blog" },
       { label: "Creator Resources", href: "/blog" },
-      { label: "Success Stories", href: "#" },
+      { label: "Success Stories", href: "/about" },
     ],
     forBrands: [
       { label: "Partner with Us", href: "/for-brands" },
-      { label: "Case Studies", href: "#" },
-      { label: "Campaign Pricing", href: "/services" },
+      { label: "Case Studies", href: "/about" },
+      { label: "Our Services", href: "/services" },
       { label: "Request Proposal", href: "/for-brands" },
     ],
     legal: [
-      { label: "Privacy Policy", href: "#" },
-      { label: "Terms of Service", href: "#" },
-      { label: "Cookie Policy", href: "#" },
+      { label: "Privacy Policy", href: "/about" },
+      { label: "Terms of Service", href: "/about" },
+      { label: "Cookie Policy", href: "/about" },
     ],
   };
 
