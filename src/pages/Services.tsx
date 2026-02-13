@@ -1,60 +1,39 @@
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { Check, ArrowRight, Zap, Shield, Users, BarChart } from "lucide-react";
+import { ArrowRight, Zap, Shield, Users, BarChart, Megaphone, Briefcase, FileText, HeartHandshake } from "lucide-react";
 import { Link } from "react-router-dom";
 
-const packages = [
+const services = [
   {
-    name: "Launch Pad",
-    price: "$299",
-    period: "/month",
-    description: "Perfect for creators just starting their brand partnership journey.",
-    features: [
-      "Brand matchmaking (3 intros/month)",
-      "Rate negotiation support",
-      "Basic performance tracking",
-      "Email support",
-      "Contract templates",
-      "Creator community access",
-    ],
-    popular: false,
+    icon: Users,
+    title: "Brand Matchmaking",
+    description: "We connect you with brands that align with your niche, audience, and values. No cold pitching — we bring the opportunities to you.",
   },
   {
-    name: "Growth Accelerator",
-    price: "$599",
-    period: "/month",
-    description: "For established creators ready to scale their brand collaborations.",
-    features: [
-      "Everything in Launch Pad",
-      "Unlimited brand introductions",
-      "Full campaign management",
-      "Contract handling & legal review",
-      "Monthly performance reports",
-      "Content strategy consultation",
-      "Priority brand matching",
-      "Dedicated account manager",
-      "Revenue optimization",
-    ],
-    popular: true,
+    icon: Briefcase,
+    title: "Campaign Management",
+    description: "From contracts to deliverables, we manage the entire campaign lifecycle so you can focus on creating great content.",
   },
   {
-    name: "Enterprise",
-    price: "Custom",
-    period: "",
-    description: "For agencies and creators managing multiple profiles.",
-    features: [
-      "Everything in Growth Accelerator",
-      "Multiple influencer management",
-      "Full campaign strategy",
-      "Dedicated account team",
-      "Custom reporting & analytics",
-      "White-label options",
-      "API access",
-      "Custom integrations",
-      "Priority support",
-    ],
-    popular: false,
+    icon: HeartHandshake,
+    title: "Rate Negotiation",
+    description: "We negotiate fair rates on your behalf, ensuring you're compensated appropriately for your influence and creativity.",
+  },
+  {
+    icon: FileText,
+    title: "Contract Handling",
+    description: "We review and handle all contracts to protect your interests, ensuring clear terms and fair agreements.",
+  },
+  {
+    icon: Megaphone,
+    title: "Content Strategy",
+    description: "Get expert guidance on content strategy, audience growth, and maximizing engagement across your platforms.",
+  },
+  {
+    icon: BarChart,
+    title: "Performance Tracking",
+    description: "Real-time analytics and monthly reports to track campaign performance and optimize your results.",
   },
 ];
 
@@ -66,8 +45,8 @@ const features = [
   },
   {
     icon: Shield,
-    title: "Contract Protection",
-    description: "We review all contracts to protect your interests.",
+    title: "No Upfront Costs",
+    description: "Our services are free for creators — we earn when you earn.",
   },
   {
     icon: Users,
@@ -76,8 +55,8 @@ const features = [
   },
   {
     icon: BarChart,
-    title: "Performance Tracking",
-    description: "Real-time analytics to optimize your campaigns.",
+    title: "Transparent Process",
+    description: "Full visibility into your campaigns, earnings, and performance.",
   },
 ];
 
@@ -97,78 +76,40 @@ const Services = () => {
               Our Services
             </span>
             <h1 className="text-4xl md:text-5xl font-heading font-bold mt-3 mb-6">
-              Pricing That Grows With You
+              Everything You Need to Grow as a Creator
             </h1>
             <p className="text-xl text-muted-foreground">
-              Transparent, flexible plans designed for creators at every stage. No hidden fees, no long-term contracts.
+              We handle the business side of influencer marketing — brand partnerships, contracts, negotiations, and more — completely free for creators.
             </p>
           </motion.div>
         </div>
       </section>
 
-      {/* Pricing Cards */}
+      {/* Services Grid */}
       <section className="py-16 lg:py-24 bg-card">
         <div className="container mx-auto px-4">
-          <div className="grid lg:grid-cols-3 gap-8">
-            {packages.map((pkg, index) => (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {services.map((service, index) => (
               <motion.div
-                key={pkg.name}
+                key={service.title}
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
-                className={`relative rounded-2xl p-8 border ${
-                  pkg.popular
-                    ? "bg-gradient-primary text-primary-foreground border-transparent scale-105"
-                    : "bg-background border-border"
-                }`}
+                className="rounded-2xl p-8 border bg-background border-border"
               >
-                {pkg.popular && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-coral text-primary-foreground text-sm font-semibold rounded-full shadow-coral">
-                    Most Popular
-                  </div>
-                )}
-
-                <h3 className="text-2xl font-heading font-bold mb-2">{pkg.name}</h3>
-                <p className={`text-sm mb-6 ${pkg.popular ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-                  {pkg.description}
-                </p>
-
-                <div className="mb-8">
-                  <span className="text-5xl font-heading font-bold">{pkg.price}</span>
-                  <span className={pkg.popular ? "text-primary-foreground/70" : "text-muted-foreground"}>
-                    {pkg.period}
-                  </span>
+                <div className="w-14 h-14 rounded-2xl bg-coral/10 flex items-center justify-center mb-5">
+                  <service.icon className="w-7 h-7 text-coral" />
                 </div>
-
-                <ul className="space-y-4 mb-8">
-                  {pkg.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-3">
-                      <Check className={`w-5 h-5 shrink-0 mt-0.5 ${pkg.popular ? "text-coral-light" : "text-coral"}`} />
-                      <span className={`text-sm ${pkg.popular ? "text-primary-foreground/90" : "text-foreground"}`}>
-                        {feature}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-
-                <Link to="/sign-up">
-                  <Button
-                    variant={pkg.popular ? "secondary" : "outline"}
-                    size="lg"
-                    className="w-full"
-                  >
-                    {pkg.price === "Custom" ? "Contact Sales" : "Get Started"}
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </Link>
+                <h3 className="text-xl font-heading font-bold mb-3">{service.title}</h3>
+                <p className="text-muted-foreground text-sm leading-relaxed">{service.description}</p>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Features */}
+      {/* Why Choose Us */}
       <section className="py-16 lg:py-24 bg-muted/30">
         <div className="container mx-auto px-4">
           <motion.div
@@ -178,10 +119,10 @@ const Services = () => {
             className="text-center max-w-2xl mx-auto mb-16"
           >
             <h2 className="text-3xl md:text-4xl font-heading font-bold mb-4">
-              What's Included in Every Plan
+              Why Creators Choose Us
             </h2>
             <p className="text-muted-foreground text-lg">
-              Core features that set us apart from other agencies.
+              We believe creators shouldn't pay to get brand deals. That's why our services are completely free for influencers.
             </p>
           </motion.div>
 
@@ -214,14 +155,22 @@ const Services = () => {
               Ready to Start Your Journey?
             </h2>
             <p className="text-lg text-muted-foreground mb-8">
-              Book a free 15-minute consultation to discuss your goals and find the perfect plan for you.
+              Join thousands of creators who are landing brand deals without the stress. Apply today — it's completely free.
             </p>
-            <Link to="/sign-up">
-              <Button variant="coral" size="xl">
-                Book Free Consultation
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </Button>
-            </Link>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link to="/for-influencers">
+                <Button variant="coral" size="xl">
+                  Apply as Creator
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </Button>
+              </Link>
+              <Link to="/for-brands">
+                <Button variant="outline" size="xl">
+                  Partner as a Brand
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </section>

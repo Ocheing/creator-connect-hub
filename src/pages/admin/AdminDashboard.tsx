@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { motion } from "framer-motion";
 import { Users, Briefcase, DollarSign, TrendingUp, UserCheck, UserX, FileText, AlertCircle } from "lucide-react";
@@ -29,7 +30,7 @@ const stats = [
   },
   {
     label: "Revenue (This Month)",
-    value: "$24,580",
+    value: "KSh 3,195,000",
     change: "+18.5% vs last",
     icon: DollarSign,
     color: "bg-purple-100 text-purple-600",
@@ -69,7 +70,7 @@ const pendingApplications = [
 const recentActivity = [
   { action: "New brand signup", detail: "Organic Beauty Co.", time: "10 min ago", type: "brand" },
   { action: "Campaign completed", detail: "FitLife Summer Challenge", time: "1 hour ago", type: "campaign" },
-  { action: "Payment processed", detail: "$850 to Sarah Chen", time: "2 hours ago", type: "payment" },
+  { action: "Payment processed", detail: "KSh 110,000 to Sarah Chen", time: "2 hours ago", type: "payment" },
   { action: "New application", detail: "Alex Thompson - Fitness", time: "2 hours ago", type: "application" },
   { action: "Deal matched", detail: "Emma R. + TechStart App", time: "4 hours ago", type: "match" },
 ];
@@ -234,10 +235,12 @@ const AdminDashboard = () => {
                   <DollarSign className="w-5 h-5 text-coral" />
                   <span>Financial Reports</span>
                 </Button>
-                <Button variant="outline" className="h-auto py-4 flex-col gap-2">
-                  <FileText className="w-5 h-5 text-coral" />
-                  <span>Content Management</span>
-                </Button>
+                <Link to="/admin/content">
+                  <Button variant="outline" className="h-auto py-4 flex-col gap-2 w-full">
+                    <FileText className="w-5 h-5 text-coral" />
+                    <span>Content Management</span>
+                  </Button>
+                </Link>
               </div>
             </CardContent>
           </Card>

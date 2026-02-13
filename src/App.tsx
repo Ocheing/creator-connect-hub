@@ -14,6 +14,7 @@ import SignUp from "./pages/SignUp";
 import InfluencerDashboard from "./pages/dashboard/InfluencerDashboard";
 import BrandDashboard from "./pages/dashboard/BrandDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import ContentManagement from "./pages/admin/ContentManagement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const App = () => (
           <Route path="/dashboard" element={<InfluencerDashboard />} />
           <Route path="/dashboard/brand" element={<BrandDashboard />} />
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/content" element={<ContentManagement />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

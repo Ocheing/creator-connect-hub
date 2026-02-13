@@ -8,7 +8,7 @@ import { Progress } from "@/components/ui/progress";
 const stats = [
   {
     label: "Total Earnings",
-    value: "$4,250",
+    value: "KSh 550,000",
     change: "+12.5%",
     trend: "up",
     icon: DollarSign,
@@ -29,7 +29,7 @@ const stats = [
   },
   {
     label: "Pending Payments",
-    value: "$850",
+    value: "KSh 110,000",
     change: "2 invoices",
     trend: "neutral",
     icon: Clock,
@@ -41,21 +41,21 @@ const recentDeals = [
     brand: "Organic Skincare Co.",
     campaign: "Summer Glow Collection",
     status: "active",
-    amount: "$500",
+    amount: "KSh 65,000",
     dueDate: "Feb 15, 2024",
   },
   {
     brand: "FitLife Supplements",
     campaign: "New Year Fitness Challenge",
     status: "pending",
-    amount: "$350",
+    amount: "KSh 45,000",
     dueDate: "Feb 20, 2024",
   },
   {
     brand: "TechStart App",
     campaign: "App Launch Promotion",
     status: "completed",
-    amount: "$600",
+    amount: "KSh 78,000",
     dueDate: "Feb 10, 2024",
   },
 ];
