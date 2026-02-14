@@ -7,27 +7,59 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { motion } from "framer-motion";
 import { Sparkles, Eye, EyeOff, ArrowRight, Users, Building2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import type { UserRole } from "@/types/database.types";
 
 const SignUp = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [role, setRole] = useState("influencer");
+  const [role, setRole] = useState<UserRole>("influencer");
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    companyName: "",
+  });
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signUp } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Simulate signup - in production, this would connect to Supabase
-    setTimeout(() => {
-      setIsLoading(false);
-      toast({
-        title: "Account created!",
-        description: "Welcome to MicroMatch. Let's get you started.",
+
+    try {
+      const { error } = await signUp({
+        email: formData.email,
+        password: formData.password,
+        fullName: formData.name,
+        role,
+        companyName: role === "brand" ? formData.companyName : undefined,
       });
-      navigate("/dashboard");
-    }, 1000);
+
+      if (error) {
+        toast({
+          title: "Registration failed",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Account created! 🎉",
+        description: "Please check your email to verify your account, then sign in.",
+      });
+      navigate("/sign-in");
+    } catch (err) {
+      toast({
+        title: "Something went wrong",
+        description: "Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -37,7 +69,7 @@ const SignUp = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: 0.3 }}
           className="w-full max-w-md"
         >
           <Link to="/" className="flex items-center gap-2 mb-8">
@@ -60,21 +92,19 @@ const SignUp = () => {
               <Label>I am a...</Label>
               <RadioGroup
                 value={role}
-                onValueChange={setRole}
+                onValueChange={(v) => setRole(v as UserRole)}
                 className="grid grid-cols-2 gap-4"
               >
                 <Label
                   htmlFor="influencer"
-                  className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${
-                    role === "influencer"
-                      ? "border-coral bg-coral/5"
-                      : "border-border hover:border-muted-foreground/30"
-                  }`}
+                  className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${role === "influencer"
+                    ? "border-coral bg-coral/5"
+                    : "border-border hover:border-muted-foreground/30"
+                    }`}
                 >
                   <RadioGroupItem value="influencer" id="influencer" className="sr-only" />
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                    role === "influencer" ? "bg-coral/10" : "bg-muted"
-                  }`}>
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${role === "influencer" ? "bg-coral/10" : "bg-muted"
+                    }`}>
                     <Users className={`w-5 h-5 ${role === "influencer" ? "text-coral" : "text-muted-foreground"}`} />
                   </div>
                   <div>
@@ -85,16 +115,14 @@ const SignUp = () => {
 
                 <Label
                   htmlFor="brand"
-                  className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${
-                    role === "brand"
-                      ? "border-coral bg-coral/5"
-                      : "border-border hover:border-muted-foreground/30"
-                  }`}
+                  className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${role === "brand"
+                    ? "border-coral bg-coral/5"
+                    : "border-border hover:border-muted-foreground/30"
+                    }`}
                 >
                   <RadioGroupItem value="brand" id="brand" className="sr-only" />
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                    role === "brand" ? "bg-coral/10" : "bg-muted"
-                  }`}>
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${role === "brand" ? "bg-coral/10" : "bg-muted"
+                    }`}>
                     <Building2 className={`w-5 h-5 ${role === "brand" ? "text-coral" : "text-muted-foreground"}`} />
                   </div>
                   <div>
@@ -112,8 +140,24 @@ const SignUp = () => {
                 type="text"
                 placeholder="Your name"
                 required
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               />
             </div>
+
+            {role === "brand" && (
+              <div className="space-y-2">
+                <Label htmlFor="companyName">Company Name</Label>
+                <Input
+                  id="companyName"
+                  type="text"
+                  placeholder="Your company"
+                  required
+                  value={formData.companyName}
+                  onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                />
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -122,6 +166,8 @@ const SignUp = () => {
                 type="email"
                 placeholder="you@email.com"
                 required
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               />
             </div>
 
@@ -134,6 +180,8 @@ const SignUp = () => {
                   placeholder="••••••••"
                   required
                   minLength={8}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 />
                 <button
                   type="button"
@@ -191,7 +239,7 @@ const SignUp = () => {
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
+          transition={{ duration: 0.3 }}
           className="max-w-md text-center text-primary-foreground"
         >
           <div className="w-20 h-20 rounded-2xl bg-primary-foreground/10 flex items-center justify-center mx-auto mb-8">
