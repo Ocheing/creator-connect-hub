@@ -918,7 +918,7 @@ export const settingsService = {
             .single();
 
         if (error) return null;
-        return data?.value || null;
+        return data?.value ?? null;
     },
 
     async updateSetting(key: string, value: string, updatedBy: string): Promise<void> {
