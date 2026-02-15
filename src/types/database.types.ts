@@ -1029,6 +1029,7 @@ export interface Database {
                 Returns: void;
             };
         };
+        CompositeTypes: {};
         Enums: {
             user_role: UserRole;
             campaign_status: CampaignStatus;
