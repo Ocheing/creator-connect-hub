@@ -1,26 +1,84 @@
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { motion } from "framer-motion";
-import { DollarSign, TrendingUp, Clock, ArrowUpRight, Download } from "lucide-react";
+import { DollarSign, TrendingUp, Clock, ArrowUpRight, Download, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-
-const stats = [
-  { label: "Total Earnings", value: "KSh 550,000", change: "+12.5%", icon: DollarSign },
-  { label: "This Month", value: "KSh 143,000", change: "+8.3%", icon: TrendingUp },
-  { label: "Pending Payouts", value: "KSh 110,000", change: "2 pending", icon: Clock },
-];
-
-const transactions = [
-  { id: "1", campaign: "Summer Glow Collection", brand: "Organic Skincare Co.", amount: "KSh 65,000", status: "completed", date: "Feb 12, 2024", method: "M-Pesa" },
-  { id: "2", campaign: "App Launch Promotion", brand: "TechStart App", amount: "KSh 78,000", status: "completed", date: "Feb 10, 2024", method: "Bank Transfer" },
-  { id: "3", campaign: "Fitness Challenge", brand: "FitLife Supplements", amount: "KSh 45,000", status: "pending", date: "Feb 8, 2024", method: "M-Pesa" },
-  { id: "4", campaign: "Eco-Friendly Living", brand: "GreenHome Kenya", amount: "KSh 50,000", status: "pending", date: "Feb 5, 2024", method: "Bank Transfer" },
-  { id: "5", campaign: "Holiday Gift Guide", brand: "Craft Market KE", amount: "KSh 35,000", status: "completed", date: "Jan 20, 2024", method: "M-Pesa" },
-  { id: "6", campaign: "Beauty Masterclass", brand: "Glow Cosmetics", amount: "KSh 90,000", status: "completed", date: "Jan 15, 2024", method: "Bank Transfer" },
-];
+import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
+import { paymentService, dashboardService } from "@/services/api"; // Added dashboardService just in case we need general stats
+import { format } from "date-fns";
 
 const InfluencerEarnings = () => {
+  const { user } = useAuth();
+  const userId = user?.id;
+
+  // Fetch Payouts
+  const { data: payouts = [], isLoading } = useQuery({
+    queryKey: ['influencerPayouts', userId],
+    queryFn: () => paymentService.getPayouts({ influencerId: userId }),
+    enabled: !!userId,
+    refetchInterval: 10000,
+  });
+
+  // We can also fetch dashboard stats for the "Total Earnings" if the RPC provides it more accurately/efficiently
+  const { data: dashboardStats } = useQuery({
+    queryKey: ['influencerStats', userId],
+    queryFn: () => dashboardService.getInfluencerStats(userId!),
+    enabled: !!userId,
+    staleTime: 60000, // Cache for 1 minute as we primarily use it for total
+  });
+
+  if (isLoading) {
+    return (
+      <DashboardLayout userType="influencer">
+        <div className="flex items-center justify-center h-full min-h-[50vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-coral" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Calculate Stats
+  const totalEarnings = dashboardStats?.total_earnings || payouts
+    .filter(p => p.status === 'completed')
+    .reduce((sum, p) => sum + p.amount, 0);
+
+  const pendingPayouts = dashboardStats?.pending_earnings || payouts
+    .filter(p => p.status === 'pending' || p.status === 'processing')
+    .reduce((sum, p) => sum + p.amount, 0);
+
+  // Simplistic "This Month" calculation from payouts list
+  const thisMonthEarnings = payouts
+    .filter(p => {
+      const isPaid = p.status === 'completed';
+      const isThisMonth = new Date(p.created_at).getMonth() === new Date().getMonth() &&
+        new Date(p.created_at).getFullYear() === new Date().getFullYear();
+      return isPaid && isThisMonth;
+    })
+    .reduce((sum, p) => sum + p.amount, 0);
+
+  const stats = [
+    {
+      label: "Total Earnings",
+      value: `KSh ${totalEarnings.toLocaleString()}`,
+      change: "Lifetime",
+      icon: DollarSign
+    },
+    {
+      label: "This Month",
+      value: `KSh ${thisMonthEarnings.toLocaleString()}`,
+      change: "Current Month",
+      icon: TrendingUp
+    },
+    {
+      label: "Pending Payouts",
+      value: `KSh ${pendingPayouts.toLocaleString()}`,
+      change: "Processing",
+      icon: Clock
+    },
+  ];
+
   return (
     <DashboardLayout userType="influencer">
       <div className="space-y-8">
@@ -68,36 +126,51 @@ const InfluencerEarnings = () => {
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Campaign</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Brand</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Amount</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Method</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Date</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transactions.map((tx) => (
-                    <tr key={tx.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                      <td className="py-3 px-4 font-medium">{tx.campaign}</td>
-                      <td className="py-3 px-4 text-muted-foreground">{tx.brand}</td>
-                      <td className="py-3 px-4 font-semibold">{tx.amount}</td>
-                      <td className="py-3 px-4 text-muted-foreground">{tx.method}</td>
-                      <td className="py-3 px-4 text-muted-foreground">{tx.date}</td>
-                      <td className="py-3 px-4">
-                        <Badge className={`border-0 ${
-                          tx.status === "completed" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
-                        }`}>
-                          {tx.status}
-                        </Badge>
-                      </td>
+              {payouts.length > 0 ? (
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Reference</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Amount</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Method</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Date</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {payouts.map((tx) => (
+                      <tr key={tx.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                        <td className="py-3 px-4 font-medium text-sm">
+                          #{tx.id.slice(0, 8)}
+                        </td>
+                        <td className="py-3 px-4">
+                          <Badge className={`border-0 ${tx.status === "completed"
+                              ? "bg-green-100 text-green-700"
+                              : tx.status === "pending" || tx.status === "processing"
+                                ? "bg-yellow-100 text-yellow-700"
+                                : "bg-red-100 text-red-700"
+                            }`}>
+                            {tx.status}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-4 font-semibold">
+                          {tx.currency} {tx.amount.toLocaleString()}
+                        </td>
+                        <td className="py-3 px-4 text-muted-foreground capitalize">
+                          {tx.payout_method || 'N/A'}
+                        </td>
+                        <td className="py-3 px-4 text-muted-foreground text-sm">
+                          {format(new Date(tx.created_at), 'MMM d, yyyy')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  No transaction history found.
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

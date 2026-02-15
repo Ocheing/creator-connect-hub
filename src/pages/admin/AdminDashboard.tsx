@@ -1,81 +1,96 @@
 import { Link } from "react-router-dom";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { motion } from "framer-motion";
-import { Users, Briefcase, DollarSign, TrendingUp, UserCheck, UserX, FileText, AlertCircle } from "lucide-react";
+import { Users, Briefcase, DollarSign, TrendingUp, UserCheck, UserX, FileText, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-const stats = [
-  {
-    label: "Total Influencers",
-    value: "523",
-    change: "+28 this month",
-    icon: Users,
-    color: "bg-blue-100 text-blue-600",
-  },
-  {
-    label: "Total Brands",
-    value: "156",
-    change: "+12 this month",
-    icon: Briefcase,
-    color: "bg-green-100 text-green-600",
-  },
-  {
-    label: "Active Campaigns",
-    value: "47",
-    change: "8 pending",
-    icon: TrendingUp,
-    color: "bg-coral/10 text-coral",
-  },
-  {
-    label: "Revenue (This Month)",
-    value: "KSh 3,195,000",
-    change: "+18.5% vs last",
-    icon: DollarSign,
-    color: "bg-purple-100 text-purple-600",
-  },
-];
-
-const pendingApplications = [
-  {
-    name: "Alex Thompson",
-    email: "alex@email.com",
-    platform: "Instagram",
-    followers: "7.2K",
-    engagement: "8.5%",
-    niche: "Fitness",
-    appliedAt: "2 hours ago",
-  },
-  {
-    name: "Jessica Wu",
-    email: "jessica@email.com",
-    platform: "TikTok",
-    followers: "9.1K",
-    engagement: "11.2%",
-    niche: "Beauty",
-    appliedAt: "5 hours ago",
-  },
-  {
-    name: "David Park",
-    email: "david@email.com",
-    platform: "YouTube",
-    followers: "4.5K",
-    engagement: "6.8%",
-    niche: "Tech",
-    appliedAt: "1 day ago",
-  },
-];
-
-const recentActivity = [
-  { action: "New brand signup", detail: "Organic Beauty Co.", time: "10 min ago", type: "brand" },
-  { action: "Campaign completed", detail: "FitLife Summer Challenge", time: "1 hour ago", type: "campaign" },
-  { action: "Payment processed", detail: "KSh 110,000 to Sarah Chen", time: "2 hours ago", type: "payment" },
-  { action: "New application", detail: "Alex Thompson - Fitness", time: "2 hours ago", type: "application" },
-  { action: "Deal matched", detail: "Emma R. + TechStart App", time: "4 hours ago", type: "match" },
-];
+import { useQuery } from "@tanstack/react-query";
+import { dashboardService, applicationService, adminService } from "@/services/api";
+import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+import { formatDistanceToNow } from "date-fns";
 
 const AdminDashboard = () => {
+  const { user } = useAuth();
+
+  // Fetch Dashboard Stats
+  const { data: stats, isLoading: isLoadingStats } = useQuery({
+    queryKey: ['adminStats'],
+    queryFn: () => dashboardService.getAdminStats(),
+    refetchInterval: 5000,
+  });
+
+  // Fetch Pending Applications
+  const { data: pendingApplications, isLoading: isLoadingApps, refetch: refetchApps } = useQuery({
+    queryKey: ['pendingApplications'],
+    queryFn: () => applicationService.getApplications({ status: 'pending' }),
+    refetchInterval: 10000,
+  });
+
+  // Fetch Recent Activity (Transaction Log)
+  const { data: transactionsData, isLoading: isLoadingActivity } = useQuery({
+    queryKey: ['adminRecentActivity'],
+    queryFn: () => adminService.getTransactionLog({ pageSize: 5 }),
+    refetchInterval: 10000,
+  });
+
+  // Using transaction log as "Recent Activity" for now. 
+  // Ideally we would have a unified activity log from multiple tables, but that's complex.
+  const recentActivity = transactionsData?.data || [];
+
+  const handleReviewApplication = async (appId: string, status: 'approved' | 'rejected') => {
+    try {
+      await applicationService.reviewApplication(appId, status, user!.id);
+      toast.success(`Application ${status}`);
+      refetchApps();
+    } catch (error) {
+      toast.error("Failed to review application");
+      console.error(error);
+    }
+  };
+
+  if (isLoadingStats || isLoadingApps || isLoadingActivity) {
+    return (
+      <DashboardLayout userType="admin">
+        <div className="flex items-center justify-center h-full min-h-[50vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-coral" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const statItems = [
+    {
+      label: "Total Influencers",
+      value: (stats?.total_influencers || 0).toString(),
+      change: "Total",
+      icon: Users,
+      color: "bg-blue-100 text-blue-600",
+    },
+    {
+      label: "Total Brands",
+      value: (stats?.total_brands || 0).toString(),
+      change: "Total",
+      icon: Briefcase,
+      color: "bg-green-100 text-green-600",
+    },
+    {
+      label: "Active Campaigns",
+      value: (stats?.active_campaigns || 0).toString(),
+      change: "Active",
+      icon: TrendingUp,
+      color: "bg-coral/10 text-coral",
+    },
+    {
+      label: "Revenue (Month)",
+      value: `KSh ${(stats?.monthly_revenue || 0).toLocaleString()}`,
+      change: "This month",
+      icon: DollarSign,
+      color: "bg-purple-100 text-purple-600",
+    },
+  ];
+
   return (
     <DashboardLayout userType="admin">
       <div className="space-y-8">
@@ -89,7 +104,7 @@ const AdminDashboard = () => {
 
         {/* Stats Grid */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat, index) => (
+          {statItems.map((stat, index) => (
             <motion.div
               key={stat.label}
               initial={{ opacity: 0, y: 20 }}
@@ -120,92 +135,96 @@ const AdminDashboard = () => {
             transition={{ delay: 0.4 }}
             className="lg:col-span-2"
           >
-            <Card>
+            <Card className="h-full">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div className="flex items-center gap-2">
                   <CardTitle>Pending Applications</CardTitle>
                   <span className="px-2 py-0.5 bg-coral/10 text-coral text-xs font-medium rounded-full">
-                    {pendingApplications.length} new
+                    {pendingApplications?.length || 0} new
                   </span>
                 </div>
-                <Button variant="ghost" size="sm">
-                  View All
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/admin/applications">View All</Link>
                 </Button>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {pendingApplications.map((app) => (
-                    <div
-                      key={app.email}
-                      className="flex items-center justify-between p-4 rounded-xl bg-muted/50"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-coral/10 flex items-center justify-center">
-                          <span className="font-semibold text-coral text-sm">
-                            {app.name.split(" ").map((n) => n[0]).join("")}
-                          </span>
+                {pendingApplications && pendingApplications.length > 0 ? (
+                  <div className="space-y-4">
+                    {pendingApplications.slice(0, 5).map((app) => (
+                      <div
+                        key={app.id}
+                        className="flex items-center justify-between p-4 rounded-xl bg-muted/50"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-full bg-coral/10 flex items-center justify-center">
+                            <span className="font-semibold text-coral text-sm">
+                              A
+                            </span>
+                          </div>
+                          <div>
+                            <p className="font-medium">App #{app.id.slice(0, 8)}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Proposed Rate: KSh {app.proposed_rate?.toLocaleString() || 'N/A'}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-medium">{app.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {app.platform} • {app.followers} • {app.engagement} engagement
-                          </p>
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" variant="outline" onClick={() => handleReviewApplication(app.id, 'rejected')}>
+                            <UserX className="w-4 h-4 mr-1" />
+                            Reject
+                          </Button>
+                          <Button size="sm" variant="coral" onClick={() => handleReviewApplication(app.id, 'approved')}>
+                            <UserCheck className="w-4 h-4 mr-1" />
+                            Approve
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button size="sm" variant="outline">
-                          <UserX className="w-4 h-4 mr-1" />
-                          Reject
-                        </Button>
-                        <Button size="sm" variant="coral">
-                          <UserCheck className="w-4 h-4 mr-1" />
-                          Approve
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No pending applications. Good job!
+                  </div>
+                )}
               </CardContent>
             </Card>
           </motion.div>
 
-          {/* Recent Activity */}
+          {/* Recent Activity (Logs) */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
           >
-            <Card>
+            <Card className="h-full">
               <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
+                <CardTitle>Recent Transactions</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {recentActivity.map((activity, index) => (
-                    <div key={index} className="flex gap-3">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                        activity.type === "brand"
-                          ? "bg-blue-100"
-                          : activity.type === "payment"
-                          ? "bg-green-100"
-                          : activity.type === "campaign"
-                          ? "bg-purple-100"
-                          : "bg-coral/10"
-                      }`}>
-                        {activity.type === "brand" && <Briefcase className="w-4 h-4 text-blue-600" />}
-                        {activity.type === "payment" && <DollarSign className="w-4 h-4 text-green-600" />}
-                        {activity.type === "campaign" && <TrendingUp className="w-4 h-4 text-purple-600" />}
-                        {activity.type === "application" && <FileText className="w-4 h-4 text-coral" />}
-                        {activity.type === "match" && <Users className="w-4 h-4 text-coral" />}
+                {recentActivity.length > 0 ? (
+                  <div className="space-y-4">
+                    {recentActivity.map((activity, index) => (
+                      <div key={activity.id} className="flex gap-3">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-coral/10`}>
+                          <DollarSign className="w-4 h-4 text-coral" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium capitalize">{activity.action.replace('_', ' ')}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {activity.entity_type} {activity.entity_id.slice(0, 8)} - {activity.new_status}
+                          </p>
+                        </div>
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}
+                        </span>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium">{activity.action}</p>
-                        <p className="text-xs text-muted-foreground truncate">{activity.detail}</p>
-                      </div>
-                      <span className="text-xs text-muted-foreground shrink-0">{activity.time}</span>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No recent activity.
+                  </div>
+                )}
               </CardContent>
             </Card>
           </motion.div>
@@ -223,24 +242,30 @@ const AdminDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Button variant="outline" className="h-auto py-4 flex-col gap-2">
-                  <Users className="w-5 h-5 text-coral" />
-                  <span>Manage Users</span>
+                <Button variant="outline" className="h-auto py-4 flex-col gap-2" asChild>
+                  <Link to="/admin/users">
+                    <Users className="w-5 h-5 text-coral" />
+                    <span>Manage Users</span>
+                  </Link>
                 </Button>
-                <Button variant="outline" className="h-auto py-4 flex-col gap-2">
-                  <Briefcase className="w-5 h-5 text-coral" />
-                  <span>View Campaigns</span>
+                <Button variant="outline" className="h-auto py-4 flex-col gap-2" asChild>
+                  <Link to="/admin/campaigns">
+                    <Briefcase className="w-5 h-5 text-coral" />
+                    <span>View Campaigns</span>
+                  </Link>
                 </Button>
-                <Button variant="outline" className="h-auto py-4 flex-col gap-2">
-                  <DollarSign className="w-5 h-5 text-coral" />
-                  <span>Financial Reports</span>
+                <Button variant="outline" className="h-auto py-4 flex-col gap-2" asChild>
+                  <Link to="/admin/finance">
+                    <DollarSign className="w-5 h-5 text-coral" />
+                    <span>Financial Reports</span>
+                  </Link>
                 </Button>
-                <Link to="/admin/content">
-                  <Button variant="outline" className="h-auto py-4 flex-col gap-2 w-full">
+                <Button variant="outline" className="h-auto py-4 flex-col gap-2 w-full" asChild>
+                  <Link to="/admin/content">
                     <FileText className="w-5 h-5 text-coral" />
                     <span>Content Management</span>
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               </div>
             </CardContent>
           </Card>

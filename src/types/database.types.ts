@@ -2,6 +2,7 @@
 // MicroMatch: Database Type Definitions
 // Auto-generated from Supabase schema
 // ============================================================
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 
 export type UserRole = 'influencer' | 'brand' | 'admin';
 export type CampaignStatus = 'draft' | 'pending_approval' | 'active' | 'paused' | 'completed' | 'cancelled';

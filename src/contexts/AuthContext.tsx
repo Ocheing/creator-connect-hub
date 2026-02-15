@@ -68,12 +68,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 .single();
 
             if (error) {
+                // Ignore AbortError as it's expected during component unmount or rapid updates
+                if (error.message?.includes('AbortError') || error.message?.includes('signal is aborted')) {
+                    return null;
+                }
                 console.error('Error fetching profile:', error.message);
                 return null;
             }
 
             return data as Profile;
-        } catch (err) {
+        } catch (err: unknown) {
+            // Ignore AbortError as it's expected during component unmount or rapid updates
+            if (err instanceof Error && (err.name === 'AbortError' || err.message?.includes('AbortError') || err.message?.includes('signal is aborted'))) {
+                return null;
+            }
             console.error('Unexpected error fetching profile:', err);
             return null;
         }
@@ -140,7 +148,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         isAuthenticated: false,
                     });
                 }
-            } catch (err) {
+            } catch (err: unknown) {
+                // Ignore AbortError during initialization
+                if (err instanceof Error && (err.name === 'AbortError' || err.message?.includes('AbortError'))) {
+                    if (mounted) {
+                        setState({
+                            user: null,
+                            profile: null,
+                            session: null,
+                            isLoading: false,
+                            isAuthenticated: false,
+                        });
+                    }
+                    return;
+                }
+
                 console.error('Auth initialization error:', err);
                 if (mounted) {
                     setState({
@@ -285,4 +307,4 @@ export const useAuth = (): AuthContextType => {
     return context;
 };
 
-export default AuthContext;
+

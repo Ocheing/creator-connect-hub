@@ -1,170 +1,348 @@
+import { useState, useMemo, useEffect } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
-import { motion } from "framer-motion";
-import { MessageSquare, Search, Send, Paperclip } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Search, Send, Loader2, Paperclip } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
+import { Message, Profile } from "@/types/database.types";
+import { format } from "date-fns";
+import { messageService } from "@/services/api";
+import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
 
-const conversations = [
-  {
-    id: "1",
-    name: "Organic Skincare Co.",
-    avatar: "OS",
-    lastMessage: "Great! Looking forward to seeing the content.",
-    time: "2 min ago",
-    unread: 2,
-    campaign: "Summer Glow Collection",
-  },
-  {
-    id: "2",
-    name: "FitLife Supplements",
-    avatar: "FL",
-    lastMessage: "Can you send the draft by Friday?",
-    time: "1 hour ago",
-    unread: 0,
-    campaign: "Fitness Challenge",
-  },
-  {
-    id: "3",
-    name: "MicroMatch Support",
-    avatar: "MM",
-    lastMessage: "Your payout of KSh 78,000 has been processed.",
-    time: "3 hours ago",
-    unread: 1,
-    campaign: null,
-  },
-  {
-    id: "4",
-    name: "GreenHome Kenya",
-    avatar: "GH",
-    lastMessage: "Welcome aboard! Let's discuss the campaign details.",
-    time: "1 day ago",
-    unread: 0,
-    campaign: "Eco-Friendly Living",
-  },
-];
-
-const messages = [
-  { id: "1", sender: "them", text: "Hi! We loved your content style and would like to discuss the campaign details.", time: "10:00 AM" },
-  { id: "2", sender: "me", text: "Thank you! I'm excited about the Summer Glow Collection. What are the key deliverables?", time: "10:15 AM" },
-  { id: "3", sender: "them", text: "We need 3 Instagram posts featuring our new sunscreen line, plus 5 Stories showing your daily routine.", time: "10:20 AM" },
-  { id: "4", sender: "me", text: "That sounds great! I can start creating content this week. Any specific brand guidelines?", time: "10:30 AM" },
-  { id: "5", sender: "them", text: "Great! Looking forward to seeing the content.", time: "10:35 AM" },
-];
+type Conversation = {
+  partnerId: string;
+  partnerName: string;
+  partnerAvatar?: string;
+  lastMessage: string;
+  lastMessageAt: string;
+  unreadCount: number;
+  messages: Message[];
+};
 
 interface MessagesProps {
-  userType?: "influencer" | "brand";
+  userType?: "influencer" | "brand" | "admin";
 }
 
 const Messages = ({ userType = "influencer" }: MessagesProps) => {
-  const [selectedConvo, setSelectedConvo] = useState(conversations[0]);
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [selectedConvoId, setSelectedConvoId] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Fetch all messages for the current user
+  const { data: rawMessages = [], isLoading: isLoadingMessages } = useQuery({
+    queryKey: ["messages", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      return messageService.getConversations(user.id);
+    },
+    enabled: !!user,
+    refetchInterval: 10000, // Poll every 10 seconds as a fallback
+  });
+
+  // Real-time subscription
+  useEffect(() => {
+    if (!user) return;
+
+    const handleInvalidate = () => {
+      queryClient.invalidateQueries({ queryKey: ["messages", user.id] });
+    };
+
+    const channel = supabase
+      .channel('messages-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'messages',
+          filter: `receiver_id=eq.${user.id}`,
+        },
+        handleInvalidate
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'messages',
+          filter: `sender_id=eq.${user.id}`,
+        },
+        handleInvalidate
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, queryClient]);
+
+  // Extract unique partner IDs to fetch their profiles
+  const partnerIds = useMemo(() => {
+    if (!user) return [];
+    const ids = new Set<string>();
+    rawMessages.forEach(msg => {
+      const partnerId = msg.sender_id === user.id ? msg.receiver_id : msg.sender_id;
+      ids.add(partnerId);
+    });
+    return Array.from(ids);
+  }, [rawMessages, user]);
+
+  // Fetch profiles for all partners
+  const { data: profiles = [] } = useQuery({
+    queryKey: ["message-profiles", partnerIds],
+    queryFn: async () => {
+      if (partnerIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .in('id', partnerIds);
+
+      if (error) throw error;
+      return data as Partial<Profile>[];
+    },
+    enabled: partnerIds.length > 0,
+  });
+
+  // Group messages into conversations
+  const conversations = useMemo(() => {
+    if (!user) return [];
+
+    const groups: Record<string, Message[]> = {};
+
+    // Group by partner ID
+    rawMessages.forEach(msg => {
+      const partnerId = msg.sender_id === user.id ? msg.receiver_id : msg.sender_id;
+      if (!groups[partnerId]) groups[partnerId] = [];
+      groups[partnerId].push(msg);
+    });
+
+    // Create conversation objects
+    const convos: Conversation[] = Object.keys(groups).map(partnerId => {
+      const msgs = groups[partnerId].sort((a, b) =>
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+      const lastMsg = msgs[msgs.length - 1];
+      const unread = msgs.filter(m => m.receiver_id === user.id && !m.is_read).length;
+      const profile = profiles.find(p => p.id === partnerId);
+
+      return {
+        partnerId,
+        partnerName: profile?.full_name || "Unknown User",
+        partnerAvatar: profile?.avatar_url || undefined,
+        lastMessage: lastMsg.body,
+        lastMessageAt: lastMsg.created_at,
+        unreadCount: unread,
+        messages: msgs,
+      };
+    });
+
+    // Sort conversations by last message time (desc)
+    return convos.sort((a, b) =>
+      new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
+    );
+  }, [rawMessages, profiles, user]);
+
+  // Select first conversation by default if none selected
+  useEffect(() => {
+    if (!selectedConvoId && conversations.length > 0) {
+      setSelectedConvoId(conversations[0].partnerId);
+    }
+  }, [conversations, selectedConvoId]);
+
+  const selectedConversation = useMemo(() =>
+    conversations.find(c => c.partnerId === selectedConvoId),
+    [conversations, selectedConvoId]
+  );
+
+  // Send message mutation
+  const sendMessageMutation = useMutation({
+    mutationFn: async (vars: { receiverId: string; body: string }) => {
+      if (!user) throw new Error("No user");
+      return messageService.sendMessage({
+        sender_id: user.id,
+        receiver_id: vars.receiverId,
+        body: vars.body,
+      });
+    },
+    onSuccess: () => {
+      setNewMessage("");
+      queryClient.invalidateQueries({ queryKey: ["messages", user?.id] });
+    },
+  });
+
+  const handleSendMessage = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!newMessage.trim() || !selectedConvoId) return;
+    sendMessageMutation.mutate({
+      receiverId: selectedConvoId,
+      body: newMessage,
+    });
+  };
+
+  const filteredConversations = conversations.filter(c =>
+    c.partnerName.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  if (isLoadingMessages) {
+    return (
+      <DashboardLayout userType={userType}>
+        <div className="flex items-center justify-center h-[50vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout userType={userType}>
-      <div className="space-y-4">
-        <h1 className="text-3xl font-heading font-bold">Messages</h1>
+      <div className="space-y-4 h-[calc(100vh-100px)] flex flex-col">
+        <div>
+          <h1 className="text-3xl font-heading font-bold">Messages</h1>
+          <p className="text-muted-foreground">Chat with brands and influencers.</p>
+        </div>
 
-        <div className="grid lg:grid-cols-3 gap-4 h-[calc(100vh-220px)]">
-          {/* Conversations List */}
-          <Card className="lg:col-span-1 flex flex-col overflow-hidden">
-            <CardHeader className="pb-3">
+        <div className="flex flex-col lg:grid lg:grid-cols-3 gap-4 flex-1 overflow-hidden h-full pb-4">
+          {/* Conversation List */}
+          <Card className="lg:col-span-1 flex flex-col overflow-hidden h-full">
+            <CardHeader className="pb-3 border-b border-border/50">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input placeholder="Search messages..." className="pl-10" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search messages..."
+                  className="pl-9"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
               </div>
             </CardHeader>
-            <CardContent className="flex-1 overflow-y-auto p-0">
-              {conversations.map((convo) => (
-                <button
-                  key={convo.id}
-                  onClick={() => setSelectedConvo(convo)}
-                  className={`w-full flex items-start gap-3 p-4 text-left hover:bg-muted/50 transition-colors border-b border-border/50 ${
-                    selectedConvo.id === convo.id ? "bg-muted/50" : ""
-                  }`}
-                >
-                  <div className="w-10 h-10 rounded-full bg-coral/10 flex items-center justify-center shrink-0">
-                    <span className="font-semibold text-coral text-sm">{convo.avatar}</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start">
-                      <p className="font-medium text-sm truncate">{convo.name}</p>
-                      <span className="text-xs text-muted-foreground shrink-0 ml-2">{convo.time}</span>
+            <ScrollArea className="flex-1">
+              <div className="flex flex-col">
+                {filteredConversations.map((convo) => (
+                  <button
+                    key={convo.partnerId}
+                    onClick={() => setSelectedConvoId(convo.partnerId)}
+                    className={`w-full p-4 flex items-start gap-3 hover:bg-muted/50 transition-colors text-left border-b border-border/50 ${selectedConvoId === convo.partnerId ? "bg-muted" : ""
+                      }`}
+                  >
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={convo.partnerAvatar} />
+                      <AvatarFallback>{convo.partnerName[0]}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 overflow-hidden">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="font-semibold truncate text-sm">{convo.partnerName}</span>
+                        <span className="text-[10px] text-muted-foreground whitespace-nowrap ml-2">
+                          {format(new Date(convo.lastMessageAt), 'MMM d, h:mm a')}
+                        </span>
+                      </div>
+                      <p className={`text-sm truncate ${convo.unreadCount > 0 ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
+                        {convo.lastMessage}
+                      </p>
                     </div>
-                    {convo.campaign && (
-                      <p className="text-xs text-coral truncate">{convo.campaign}</p>
+                    {convo.unreadCount > 0 && (
+                      <Badge className="bg-primary text-primary-foreground h-5 w-5 flex items-center justify-center rounded-full p-0 text-[10px] shrink-0">
+                        {convo.unreadCount}
+                      </Badge>
                     )}
-                    <p className="text-sm text-muted-foreground truncate mt-0.5">{convo.lastMessage}</p>
+                  </button>
+                ))}
+                {filteredConversations.length === 0 && (
+                  <div className="p-8 text-center text-muted-foreground text-sm">
+                    No conversations found.
                   </div>
-                  {convo.unread > 0 && (
-                    <Badge className="bg-coral text-white border-0 shrink-0">{convo.unread}</Badge>
-                  )}
-                </button>
-              ))}
-            </CardContent>
+                )}
+              </div>
+            </ScrollArea>
           </Card>
 
           {/* Chat Area */}
-          <Card className="lg:col-span-2 flex flex-col overflow-hidden">
-            <CardHeader className="border-b border-border pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-coral/10 flex items-center justify-center">
-                  <span className="font-semibold text-coral text-sm">{selectedConvo.avatar}</span>
-                </div>
-                <div>
-                  <p className="font-semibold">{selectedConvo.name}</p>
-                  {selectedConvo.campaign && (
-                    <p className="text-xs text-muted-foreground">Re: {selectedConvo.campaign}</p>
-                  )}
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
-              {messages.map((msg) => (
-                <motion.div
-                  key={msg.id}
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`flex ${msg.sender === "me" ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-[70%] rounded-2xl px-4 py-3 ${
-                      msg.sender === "me"
-                        ? "bg-coral text-white rounded-br-md"
-                        : "bg-muted rounded-bl-md"
-                    }`}
-                  >
-                    <p className="text-sm">{msg.text}</p>
-                    <p className={`text-xs mt-1 ${msg.sender === "me" ? "text-white/70" : "text-muted-foreground"}`}>
-                      {msg.time}
-                    </p>
+          <Card className="lg:col-span-2 flex flex-col overflow-hidden h-full">
+            {selectedConversation ? (
+              <>
+                <CardHeader className="border-b border-border/50 py-4 shrink-0">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={selectedConversation.partnerAvatar} />
+                      <AvatarFallback>{selectedConversation.partnerName[0]}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <h3 className="font-semibold">{selectedConversation.partnerName}</h3>
+                      {/* Placeholder for status */}
+                    </div>
                   </div>
-                </motion.div>
-              ))}
-            </CardContent>
-            <div className="p-4 border-t border-border">
-              <div className="flex gap-2">
-                <Button variant="ghost" size="icon" className="shrink-0">
-                  <Paperclip className="w-4 h-4" />
-                </Button>
-                <Input
-                  placeholder="Type a message..."
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  className="flex-1"
-                />
-                <Button variant="coral" size="icon" className="shrink-0">
-                  <Send className="w-4 h-4" />
-                </Button>
+                </CardHeader>
+
+                <ScrollArea className="flex-1 p-4">
+                  <div className="space-y-4">
+                    {selectedConversation.messages.map((msg, index) => {
+                      const isMe = msg.sender_id === user?.id;
+                      return (
+                        <motion.div
+                          key={msg.id}
+                          initial={{ opacity: 0, y: 5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className={`flex ${isMe ? "justify-end" : "justify-start"}`}
+                        >
+                          <div
+                            className={`max-w-[75%] px-4 py-2 ${isMe
+                              ? "bg-primary text-primary-foreground rounded-2xl rounded-tr-sm"
+                              : "bg-muted rounded-2xl rounded-tl-sm"
+                              }`}
+                          >
+                            <p className="text-sm">{msg.body}</p>
+                            <span className={`text-[10px] block text-right mt-1 opacity-70`}>
+                              {format(new Date(msg.created_at), 'p')}
+                            </span>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+
+                <div className="p-4 border-t border-border/50 bg-card shrink-0">
+                  <form
+                    onSubmit={handleSendMessage}
+                    className="flex gap-2"
+                  >
+                    <Button variant="ghost" size="icon" type="button" className="shrink-0">
+                      <Paperclip className="h-4 w-4" />
+                    </Button>
+                    <Input
+                      placeholder="Type a message..."
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      disabled={sendMessageMutation.isPending}
+                      className="flex-1"
+                    />
+                    <Button type="submit" size="icon" disabled={sendMessageMutation.isPending}>
+                      {sendMessageMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </form>
+                </div>
+              </>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-8">
+                <Search className="h-12 w-12 mb-4 opacity-20" />
+                <p>Select a conversation to start chatting</p>
               </div>
-            </div>
+            )}
           </Card>
         </div>
       </div>
     </DashboardLayout>
   );
 };
-
 export default Messages;

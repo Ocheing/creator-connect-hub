@@ -66,6 +66,7 @@ interface PublicOnlyRouteProps {
 
 export const PublicOnlyRoute: React.FC<PublicOnlyRouteProps> = ({ children }) => {
     const { isAuthenticated, isLoading, profile } = useAuth();
+    const location = useLocation();
 
     if (isLoading) {
         return <LoadingSpinner />;
@@ -77,7 +78,12 @@ export const PublicOnlyRoute: React.FC<PublicOnlyRouteProps> = ({ children }) =>
             brand: '/dashboard/brand',
             admin: '/admin',
         };
-        return <Navigate to={roleRedirectMap[profile.role] || '/dashboard'} replace />;
+        const from = (location.state as { from?: { pathname: string } })?.from?.pathname;
+        const target = from && from !== '/' && from !== '/sign-in' && from !== '/sign-up'
+            ? from
+            : (roleRedirectMap[profile.role] || '/dashboard');
+
+        return <Navigate to={target} replace />;
     }
 
     return <>{children}</>;

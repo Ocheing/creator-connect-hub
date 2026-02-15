@@ -12,39 +12,42 @@ import {
   BrandRoute,
 } from "@/components/auth/ProtectedRoute";
 
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { Suspense, lazy } from "react";
+
 // Public Pages
-import Index from "./pages/Index";
-import Services from "./pages/Services";
-import ForInfluencers from "./pages/ForInfluencers";
-import ForBrands from "./pages/ForBrands";
-import About from "./pages/About";
-import Blog from "./pages/Blog";
-import SignIn from "./pages/SignIn";
-import SignUp from "./pages/SignUp";
+const Index = lazy(() => import("./pages/Index"));
+const Services = lazy(() => import("./pages/Services"));
+const ForInfluencers = lazy(() => import("./pages/ForInfluencers"));
+const ForBrands = lazy(() => import("./pages/ForBrands"));
+const About = lazy(() => import("./pages/About"));
+const Blog = lazy(() => import("./pages/Blog"));
+const SignIn = lazy(() => import("./pages/SignIn"));
+const SignUp = lazy(() => import("./pages/SignUp"));
 
 // Dashboard Pages
-import InfluencerDashboard from "./pages/dashboard/InfluencerDashboard";
-import InfluencerApplications from "./pages/dashboard/InfluencerApplications";
-import InfluencerDeals from "./pages/dashboard/InfluencerDeals";
-import InfluencerEarnings from "./pages/dashboard/InfluencerEarnings";
-import Messages from "./pages/dashboard/Messages";
-import DashboardSettings from "./pages/dashboard/DashboardSettings";
-import BrandDashboard from "./pages/dashboard/BrandDashboard";
-import BrandCampaigns from "./pages/dashboard/BrandCampaigns";
-import BrandInfluencers from "./pages/dashboard/BrandInfluencers";
-import BrandBudget from "./pages/dashboard/BrandBudget";
+const InfluencerDashboard = lazy(() => import("./pages/dashboard/InfluencerDashboard"));
+const InfluencerApplications = lazy(() => import("./pages/dashboard/InfluencerApplications"));
+const InfluencerDeals = lazy(() => import("./pages/dashboard/InfluencerDeals"));
+const InfluencerEarnings = lazy(() => import("./pages/dashboard/InfluencerEarnings"));
+const Messages = lazy(() => import("./pages/dashboard/Messages"));
+const DashboardSettings = lazy(() => import("./pages/dashboard/DashboardSettings"));
+const BrandDashboard = lazy(() => import("./pages/dashboard/BrandDashboard"));
+const BrandCampaigns = lazy(() => import("./pages/dashboard/BrandCampaigns"));
+const BrandInfluencers = lazy(() => import("./pages/dashboard/BrandInfluencers"));
+const BrandBudget = lazy(() => import("./pages/dashboard/BrandBudget"));
 
 // Admin Pages
-import AdminDashboard from "./pages/admin/AdminDashboard";
-import AdminUsers from "./pages/admin/AdminUsers";
-import AdminCampaigns from "./pages/admin/AdminCampaigns";
-import AdminApplications from "./pages/admin/AdminApplications";
-import AdminFinances from "./pages/admin/AdminFinances";
-import ContentManagement from "./pages/admin/ContentManagement";
-import AdminSettings from "./pages/admin/AdminSettings";
+const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
+const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
+const AdminCampaigns = lazy(() => import("./pages/admin/AdminCampaigns"));
+const AdminApplications = lazy(() => import("./pages/admin/AdminApplications"));
+const AdminFinances = lazy(() => import("./pages/admin/AdminFinances"));
+const ContentManagement = lazy(() => import("./pages/admin/ContentManagement"));
+const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
 
 // Error Pages
-import NotFound from "./pages/NotFound";
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -70,19 +73,19 @@ const App = () => (
         >
           <Routes>
             {/* ── Public Routes ── */}
-            <Route path="/" element={<Index />} />
-            <Route path="/services" element={<Services />} />
-            <Route path="/for-influencers" element={<ForInfluencers />} />
-            <Route path="/for-brands" element={<ForBrands />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/blog" element={<Blog />} />
+            <Route path="/" element={<Suspense fallback={<LoadingSpinner />}><Index /></Suspense>} />
+            <Route path="/services" element={<Suspense fallback={<LoadingSpinner />}><Services /></Suspense>} />
+            <Route path="/for-influencers" element={<Suspense fallback={<LoadingSpinner />}><ForInfluencers /></Suspense>} />
+            <Route path="/for-brands" element={<Suspense fallback={<LoadingSpinner />}><ForBrands /></Suspense>} />
+            <Route path="/about" element={<Suspense fallback={<LoadingSpinner />}><About /></Suspense>} />
+            <Route path="/blog" element={<Suspense fallback={<LoadingSpinner />}><Blog /></Suspense>} />
 
             {/* ── Auth Routes (redirect if already logged in) ── */}
             <Route
               path="/sign-in"
               element={
                 <PublicOnlyRoute>
-                  <SignIn />
+                  <Suspense fallback={<LoadingSpinner />}><SignIn /></Suspense>
                 </PublicOnlyRoute>
               }
             />
@@ -90,7 +93,7 @@ const App = () => (
               path="/sign-up"
               element={
                 <PublicOnlyRoute>
-                  <SignUp />
+                  <Suspense fallback={<LoadingSpinner />}><SignUp /></Suspense>
                 </PublicOnlyRoute>
               }
             />
@@ -100,7 +103,7 @@ const App = () => (
               path="/dashboard"
               element={
                 <InfluencerRoute>
-                  <InfluencerDashboard />
+                  <Suspense fallback={<LoadingSpinner />}><InfluencerDashboard /></Suspense>
                 </InfluencerRoute>
               }
             />
@@ -108,7 +111,7 @@ const App = () => (
               path="/dashboard/applications"
               element={
                 <InfluencerRoute>
-                  <InfluencerApplications />
+                  <Suspense fallback={<LoadingSpinner />}><InfluencerApplications /></Suspense>
                 </InfluencerRoute>
               }
             />
@@ -116,7 +119,7 @@ const App = () => (
               path="/dashboard/deals"
               element={
                 <InfluencerRoute>
-                  <InfluencerDeals />
+                  <Suspense fallback={<LoadingSpinner />}><InfluencerDeals /></Suspense>
                 </InfluencerRoute>
               }
             />
@@ -124,7 +127,7 @@ const App = () => (
               path="/dashboard/earnings"
               element={
                 <InfluencerRoute>
-                  <InfluencerEarnings />
+                  <Suspense fallback={<LoadingSpinner />}><InfluencerEarnings /></Suspense>
                 </InfluencerRoute>
               }
             />
@@ -132,7 +135,7 @@ const App = () => (
               path="/dashboard/messages"
               element={
                 <ProtectedRoute allowedRoles={['influencer', 'brand', 'admin']}>
-                  <Messages userType="influencer" />
+                  <Suspense fallback={<LoadingSpinner />}><Messages userType="influencer" /></Suspense>
                 </ProtectedRoute>
               }
             />
@@ -140,7 +143,7 @@ const App = () => (
               path="/dashboard/settings"
               element={
                 <ProtectedRoute allowedRoles={['influencer', 'brand', 'admin']}>
-                  <DashboardSettings userType="influencer" />
+                  <Suspense fallback={<LoadingSpinner />}><DashboardSettings userType="influencer" /></Suspense>
                 </ProtectedRoute>
               }
             />
@@ -150,7 +153,7 @@ const App = () => (
               path="/dashboard/brand"
               element={
                 <BrandRoute>
-                  <BrandDashboard />
+                  <Suspense fallback={<LoadingSpinner />}><BrandDashboard /></Suspense>
                 </BrandRoute>
               }
             />
@@ -158,7 +161,7 @@ const App = () => (
               path="/dashboard/campaigns"
               element={
                 <BrandRoute>
-                  <BrandCampaigns />
+                  <Suspense fallback={<LoadingSpinner />}><BrandCampaigns /></Suspense>
                 </BrandRoute>
               }
             />
@@ -166,7 +169,7 @@ const App = () => (
               path="/dashboard/influencers"
               element={
                 <BrandRoute>
-                  <BrandInfluencers />
+                  <Suspense fallback={<LoadingSpinner />}><BrandInfluencers /></Suspense>
                 </BrandRoute>
               }
             />
@@ -174,7 +177,7 @@ const App = () => (
               path="/dashboard/budget"
               element={
                 <BrandRoute>
-                  <BrandBudget />
+                  <Suspense fallback={<LoadingSpinner />}><BrandBudget /></Suspense>
                 </BrandRoute>
               }
             />
@@ -184,7 +187,7 @@ const App = () => (
               path="/admin"
               element={
                 <AdminRoute>
-                  <AdminDashboard />
+                  <Suspense fallback={<LoadingSpinner />}><AdminDashboard /></Suspense>
                 </AdminRoute>
               }
             />
@@ -192,7 +195,7 @@ const App = () => (
               path="/admin/users"
               element={
                 <AdminRoute>
-                  <AdminUsers />
+                  <Suspense fallback={<LoadingSpinner />}><AdminUsers /></Suspense>
                 </AdminRoute>
               }
             />
@@ -200,7 +203,7 @@ const App = () => (
               path="/admin/campaigns"
               element={
                 <AdminRoute>
-                  <AdminCampaigns />
+                  <Suspense fallback={<LoadingSpinner />}><AdminCampaigns /></Suspense>
                 </AdminRoute>
               }
             />
@@ -208,7 +211,7 @@ const App = () => (
               path="/admin/applications"
               element={
                 <AdminRoute>
-                  <AdminApplications />
+                  <Suspense fallback={<LoadingSpinner />}><AdminApplications /></Suspense>
                 </AdminRoute>
               }
             />
@@ -216,7 +219,7 @@ const App = () => (
               path="/admin/finances"
               element={
                 <AdminRoute>
-                  <AdminFinances />
+                  <Suspense fallback={<LoadingSpinner />}><AdminFinances /></Suspense>
                 </AdminRoute>
               }
             />
@@ -224,7 +227,7 @@ const App = () => (
               path="/admin/content"
               element={
                 <AdminRoute>
-                  <ContentManagement />
+                  <Suspense fallback={<LoadingSpinner />}><ContentManagement /></Suspense>
                 </AdminRoute>
               }
             />
@@ -232,13 +235,13 @@ const App = () => (
               path="/admin/settings"
               element={
                 <AdminRoute>
-                  <AdminSettings />
+                  <Suspense fallback={<LoadingSpinner />}><AdminSettings /></Suspense>
                 </AdminRoute>
               }
             />
 
             {/* ── 404 ── */}
-            <Route path="*" element={<NotFound />} />
+            <Route path="*" element={<Suspense fallback={<LoadingSpinner />}><NotFound /></Suspense>} />
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
