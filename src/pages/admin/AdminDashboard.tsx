@@ -6,44 +6,73 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { dashboardService, applicationService, adminService } from "@/services/api";
-import { useState } from "react";
+import { useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { supabase } from "@/lib/supabase";
 
 const AdminDashboard = () => {
   const { user } = useAuth();
 
   // Fetch Dashboard Stats
-  const { data: stats, isLoading: isLoadingStats } = useQuery({
+  const { data: stats, isLoading: isLoadingStats, refetch: refetchStats } = useQuery({
     queryKey: ['adminStats'],
     queryFn: () => dashboardService.getAdminStats(),
-    refetchInterval: 5000,
   });
 
   // Fetch Pending Applications
   const { data: pendingApplications, isLoading: isLoadingApps, refetch: refetchApps } = useQuery({
     queryKey: ['pendingApplications'],
     queryFn: () => applicationService.getApplications({ status: 'pending' }),
-    refetchInterval: 10000,
   });
 
   // Fetch Recent Activity (Transaction Log)
-  const { data: transactionsData, isLoading: isLoadingActivity } = useQuery({
+  const { data: transactionsData, isLoading: isLoadingActivity, refetch: refetchActivity } = useQuery({
     queryKey: ['adminRecentActivity'],
     queryFn: () => adminService.getTransactionLog({ pageSize: 5 }),
-    refetchInterval: 10000,
   });
 
-  // Using transaction log as "Recent Activity" for now. 
-  // Ideally we would have a unified activity log from multiple tables, but that's complex.
+  // Real-time subscriptions
+  useEffect(() => {
+    const channels = [
+      supabase
+        .channel('dashboard-applications')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'campaign_applications' }, () => {
+          refetchApps();
+          refetchStats();
+        })
+        .subscribe(),
+      supabase
+        .channel('dashboard-profiles')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => refetchStats())
+        .subscribe(),
+      supabase
+        .channel('dashboard-campaigns')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'campaigns' }, () => refetchStats())
+        .subscribe(),
+      supabase
+        .channel('dashboard-payments')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => refetchStats())
+        .subscribe(),
+      supabase
+        .channel('dashboard-logs')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transaction_log' }, () => refetchActivity())
+        .subscribe()
+    ];
+
+    return () => {
+      channels.forEach(channel => supabase.removeChannel(channel));
+    };
+  }, [refetchStats, refetchApps, refetchActivity]);
+
   const recentActivity = transactionsData?.data || [];
 
   const handleReviewApplication = async (appId: string, status: 'approved' | 'rejected') => {
     try {
       await applicationService.reviewApplication(appId, status, user!.id);
       toast.success(`Application ${status}`);
-      refetchApps();
+      // refetch is handled by subscription
     } catch (error) {
       toast.error("Failed to review application");
       console.error(error);

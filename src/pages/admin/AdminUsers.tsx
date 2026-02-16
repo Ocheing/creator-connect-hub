@@ -1,22 +1,17 @@
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { motion } from "framer-motion";
-import { Users, Search, UserCheck, UserX, Shield, MoreVertical } from "lucide-react";
+import { Users, Search, UserCheck, UserX, Shield, MoreVertical, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-const users = [
-  { id: "1", name: "Sarah Chen", email: "sarah@example.com", role: "influencer", status: "active", verified: true, joinedAt: "Jan 5, 2024", followers: "8.2K" },
-  { id: "2", name: "Marcus Johnson", email: "marcus@example.com", role: "influencer", status: "active", verified: true, joinedAt: "Jan 12, 2024", followers: "5.7K" },
-  { id: "3", name: "Organic Skincare Co.", email: "info@organicskincare.co.ke", role: "brand", status: "active", verified: true, joinedAt: "Dec 10, 2023", followers: null },
-  { id: "4", name: "Alex Thompson", email: "alex@example.com", role: "influencer", status: "pending", verified: false, joinedAt: "Feb 10, 2024", followers: "7.2K" },
-  { id: "5", name: "FitLife Supplements", email: "hello@fitlife.co.ke", role: "brand", status: "active", verified: false, joinedAt: "Jan 20, 2024", followers: null },
-  { id: "6", name: "Jessica Wu", email: "jessica@example.com", role: "influencer", status: "suspended", verified: false, joinedAt: "Feb 8, 2024", followers: "9.1K" },
-  { id: "7", name: "GreenHome Kenya", email: "contact@greenhome.co.ke", role: "brand", status: "active", verified: true, joinedAt: "Feb 1, 2024", followers: null },
-  { id: "8", name: "David Park", email: "david@example.com", role: "influencer", status: "active", verified: true, joinedAt: "Jan 28, 2024", followers: "4.5K" },
-];
+import { useQuery } from "@tanstack/react-query";
+import { adminService } from "@/services/api";
+import { supabase } from "@/lib/supabase";
+import { useEffect, useState } from "react";
+import { format } from "date-fns";
+import { toast } from "sonner";
 
 const roleColors: Record<string, string> = {
   influencer: "bg-blue-100 text-blue-700",
@@ -31,6 +26,83 @@ const statusColors: Record<string, string> = {
 };
 
 const AdminUsers = () => {
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const { data: rawUsers, isLoading, refetch } = useQuery({
+    queryKey: ['adminUsers'],
+    queryFn: adminService.getAllUsersExtended,
+  });
+
+  // Real-time subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-users-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'profiles' },
+        (payload) => {
+          refetch();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refetch]);
+
+  const handleVerify = async (userId: string) => {
+    try {
+      await adminService.verifyUser(userId);
+      toast.success("User verified successfully");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to verify user");
+    }
+  };
+
+  const handleToggleActive = async (userId: string, isActive: boolean) => {
+    try {
+      await adminService.toggleUserActive(userId, isActive);
+      toast.success(isActive ? "User reactivated" : "User suspended");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to update user status");
+    }
+  };
+
+  const users = rawUsers?.map((u: any) => {
+    let status = 'active';
+    if (!u.is_active) status = 'suspended';
+    else if (!u.is_verified) status = 'pending';
+
+    return {
+      id: u.id,
+      name: u.full_name || 'Unknown',
+      email: u.email,
+      role: u.role,
+      status: status,
+      verified: u.is_verified,
+      joinedAt: u.created_at ? format(new Date(u.created_at), 'MMM d, yyyy') : 'N/A',
+      followers: u.role === 'influencer' ? (u.influencer_profile?.total_followers?.toLocaleString() || '0') : null
+    };
+  }) || [];
+
+  const filteredUsers = users.filter(u =>
+    u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (isLoading) {
+    return (
+      <DashboardLayout userType="admin">
+        <div className="flex items-center justify-center h-[50vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-coral" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout userType="admin">
       <div className="space-y-8">
@@ -41,7 +113,12 @@ const AdminUsers = () => {
           </div>
           <div className="relative sm:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input placeholder="Search users..." className="pl-10" />
+            <Input
+              placeholder="Search users..."
+              className="pl-10"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
         </div>
 
@@ -76,7 +153,7 @@ const AdminUsers = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {users
+                        {filteredUsers
                           .filter((u) => {
                             if (tab === "all") return true;
                             if (tab === "suspended") return u.status === "suspended";
@@ -88,7 +165,7 @@ const AdminUsers = () => {
                                 <div className="flex items-center gap-3">
                                   <div className="w-9 h-9 rounded-full bg-coral/10 flex items-center justify-center">
                                     <span className="font-semibold text-coral text-xs">
-                                      {user.name.split(" ").map(n => n[0]).join("")}
+                                      {user.name.split(" ").map((n: string) => n[0]).join("")}
                                     </span>
                                   </div>
                                   <div>
@@ -110,19 +187,30 @@ const AdminUsers = () => {
                               <td className="py-3 px-4">
                                 <div className="flex gap-1">
                                   {user.status === "pending" && (
-                                    <Button size="sm" variant="coral" className="text-xs h-7">Approve</Button>
+                                    <Button size="sm" variant="coral" className="text-xs h-7" onClick={() => handleVerify(user.id)}>Approve</Button>
                                   )}
                                   {user.status === "active" && (
-                                    <Button size="sm" variant="ghost" className="text-xs h-7 text-red-600">Suspend</Button>
+                                    <Button size="sm" variant="ghost" className="text-xs h-7 text-red-600" onClick={() => handleToggleActive(user.id, false)}>Suspend</Button>
                                   )}
                                   {user.status === "suspended" && (
-                                    <Button size="sm" variant="ghost" className="text-xs h-7 text-green-600">Reactivate</Button>
+                                    <Button size="sm" variant="ghost" className="text-xs h-7 text-green-600" onClick={() => handleToggleActive(user.id, true)}>Reactivate</Button>
                                   )}
                                   <Button size="sm" variant="ghost" className="text-xs h-7"><MoreVertical className="w-3 h-3" /></Button>
                                 </div>
                               </td>
                             </tr>
                           ))}
+                        {filteredUsers.filter((u) => {
+                          if (tab === "all") return true;
+                          if (tab === "suspended") return u.status === "suspended";
+                          return u.role === tab;
+                        }).length === 0 && (
+                            <tr>
+                              <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                                No users found.
+                              </td>
+                            </tr>
+                          )}
                       </tbody>
                     </table>
                   </div>

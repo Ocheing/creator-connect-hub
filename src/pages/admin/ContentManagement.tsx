@@ -1,75 +1,150 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Plus, Edit, Trash2, Save } from "lucide-react";
+import { FileText, Plus, Edit, Trash2, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-
-const initialBlogPosts = [
-  {
-    id: 1,
-    title: "Micro-Influencer Rate Guide 2024",
-    excerpt: "Learn how to price your content and negotiate fair rates with brands.",
-    category: "Guides",
-    date: "Jan 15, 2024",
-  },
-  {
-    id: 2,
-    title: "How to Pitch Brands as a Small Creator",
-    excerpt: "Step-by-step guide to crafting the perfect brand pitch.",
-    category: "Tips",
-    date: "Jan 10, 2024",
-  },
-  {
-    id: 3,
-    title: "Why Engagement Rate Matters More Than Followers",
-    excerpt: "Understanding the metrics that brands actually care about.",
-    category: "Insights",
-    date: "Jan 5, 2024",
-  },
-];
+import { useQuery } from "@tanstack/react-query";
+import { blogService, settingsService } from "@/services/api";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
+import { format } from "date-fns";
 
 const ContentManagement = () => {
-  const [blogPosts, setBlogPosts] = useState(initialBlogPosts);
-  const [editingPost, setEditingPost] = useState<number | null>(null);
-  const [newPost, setNewPost] = useState({ title: "", excerpt: "", category: "" });
+  const { user } = useAuth();
+  const [newPost, setNewPost] = useState({ title: "", excerpt: "", category: "General" });
+  const [activeTab, setActiveTab] = useState("blog");
 
-  const [aboutContent, setAboutContent] = useState({
-    founderStory: "Our founder started MicroMatch with a simple mission: to help small creators get the brand deals they deserve. After years of seeing talented creators overlooked in favour of mega-influencers, we built a platform that puts authenticity and engagement first.",
-    mission: "Fair pay and meaningful brand partnerships for every creator. We believe in the power of authentic engagement over follower count.",
-    vision: "To become East Africa's leading micro-influencer marketing agency, empowering creators to build sustainable careers from their passion.",
+  // Blog Posts Query
+  const { data: rawBlogPosts, isLoading: isLoadingBlog, refetch: refetchBlog } = useQuery({
+    queryKey: ['blogPosts'],
+    queryFn: () => blogService.getPosts(),
   });
 
-  const handleDeletePost = (id: number) => {
-    setBlogPosts(blogPosts.filter((p) => p.id !== id));
-    toast.success("Blog post deleted");
+  const blogPosts = rawBlogPosts?.data || [];
+
+  // About Content Query
+  const { data: founderStory, refetch: refetchStory } = useQuery({
+    queryKey: ['setting', 'founder_story'],
+    queryFn: () => settingsService.getSetting('founder_story')
+  });
+  const { data: mission, refetch: refetchMission } = useQuery({
+    queryKey: ['setting', 'mission'],
+    queryFn: () => settingsService.getSetting('mission')
+  });
+  const { data: vision, refetch: refetchVision } = useQuery({
+    queryKey: ['setting', 'vision'],
+    queryFn: () => settingsService.getSetting('vision')
+  });
+
+  const [aboutContent, setAboutContent] = useState({
+    founderStory: "",
+    mission: "",
+    vision: "",
+  });
+
+  // Sync state with fetched settings
+  useEffect(() => {
+    if (founderStory !== undefined) setAboutContent(prev => ({ ...prev, founderStory: founderStory || "" }));
+    if (mission !== undefined) setAboutContent(prev => ({ ...prev, mission: mission || "" }));
+    if (vision !== undefined) setAboutContent(prev => ({ ...prev, vision: vision || "" }));
+  }, [founderStory, mission, vision]);
+
+  // Real-time subscriptions
+  useEffect(() => {
+    const blogChannel = supabase
+      .channel('admin-blog-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'blog_posts' },
+        () => refetchBlog()
+      )
+      .subscribe();
+
+    const settingsChannel = supabase
+      .channel('admin-settings-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'platform_settings' },
+        () => {
+          refetchStory();
+          refetchMission();
+          refetchVision();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(blogChannel);
+      supabase.removeChannel(settingsChannel);
+    };
+  }, [refetchBlog, refetchStory, refetchMission, refetchVision]);
+
+
+  const handleDeletePost = async (id: string) => {
+    try {
+      await blogService.deletePost(id);
+      toast.success("Blog post deleted");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to delete post");
+    }
   };
 
-  const handleAddPost = () => {
-    if (!newPost.title || !newPost.excerpt) {
+  const handleAddPost = async () => {
+    if (!newPost.title || !newPost.excerpt || !user) {
       toast.error("Please fill in title and excerpt");
       return;
     }
-    setBlogPosts([
-      ...blogPosts,
-      {
-        id: Date.now(),
+
+    try {
+      await blogService.createPost({
         title: newPost.title,
         excerpt: newPost.excerpt,
-        category: newPost.category || "General",
-        date: new Date().toLocaleDateString("en-KE", { month: "short", day: "numeric", year: "numeric" }),
-      },
-    ]);
-    setNewPost({ title: "", excerpt: "", category: "" });
-    toast.success("Blog post added");
+        category: newPost.category,
+        author_id: user.id,
+        status: 'published', // Default to published for simplicity
+        tags: [],
+        content: newPost.excerpt, // Using excerpt as content for now
+        cover_image_url: null,
+        published_at: new Date().toISOString()
+      });
+
+      setNewPost({ title: "", excerpt: "", category: "General" });
+      toast.success("Blog post added");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to create post");
+    }
   };
 
-  const handleSaveAbout = () => {
-    toast.success("About page content saved");
+  const handleSaveAbout = async () => {
+    if (!user) return;
+    try {
+      await Promise.all([
+        settingsService.updateSetting('founder_story', aboutContent.founderStory, user.id),
+        settingsService.updateSetting('mission', aboutContent.mission, user.id),
+        settingsService.updateSetting('vision', aboutContent.vision, user.id),
+      ]);
+      toast.success("About page content saved");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to save settings");
+    }
   };
+
+  if (isLoadingBlog) {
+    return (
+      <DashboardLayout userType="admin">
+        <div className="flex items-center justify-center h-[50vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-coral" />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout userType="admin">
@@ -79,7 +154,7 @@ const ContentManagement = () => {
           <p className="text-muted-foreground">Manage blog posts and about page content.</p>
         </div>
 
-        <Tabs defaultValue="blog">
+        <Tabs defaultValue="blog" onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="blog">Blog Posts</TabsTrigger>
             <TabsTrigger value="about">About Page</TabsTrigger>
@@ -133,7 +208,7 @@ const ContentManagement = () => {
                         <div>
                           <p className="font-medium">{post.title}</p>
                           <p className="text-sm text-muted-foreground">
-                            {post.category} • {post.date}
+                            {post.category} • {post.created_at ? format(new Date(post.created_at), 'MMM d, yyyy') : 'N/A'}
                           </p>
                         </div>
                       </div>
@@ -147,6 +222,9 @@ const ContentManagement = () => {
                       </div>
                     </div>
                   ))}
+                  {blogPosts.length === 0 && (
+                    <div className="text-center py-6 text-muted-foreground">No blog posts found.</div>
+                  )}
                 </div>
               </CardContent>
             </Card>

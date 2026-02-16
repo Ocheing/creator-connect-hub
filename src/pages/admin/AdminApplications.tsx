@@ -1,28 +1,94 @@
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { motion } from "framer-motion";
-import { FileText, UserCheck, UserX, ExternalLink, Search } from "lucide-react";
+import { FileText, UserCheck, UserX, ExternalLink, Search, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-
-const applications = [
-  { id: "1", name: "Alex Thompson", email: "alex@example.com", platform: "Instagram", followers: "7.2K", engagement: "8.5%", niche: "Fitness", campaign: "Summer Product Launch", appliedAt: "2 hours ago", status: "pending" },
-  { id: "2", name: "Jessica Wu", email: "jessica@example.com", platform: "TikTok", followers: "9.1K", engagement: "11.2%", niche: "Beauty", campaign: "Summer Product Launch", appliedAt: "5 hours ago", status: "pending" },
-  { id: "3", name: "David Park", email: "david@example.com", platform: "YouTube", followers: "4.5K", engagement: "6.8%", niche: "Tech", campaign: "New Product Teaser", appliedAt: "1 day ago", status: "pending" },
-  { id: "4", name: "Sarah Chen", email: "sarah@example.com", platform: "Instagram", followers: "8.2K", engagement: "9.1%", niche: "Lifestyle", campaign: "Summer Product Launch", appliedAt: "3 days ago", status: "approved" },
-  { id: "5", name: "Mike Oduya", email: "mike@example.com", platform: "TikTok", followers: "3.2K", engagement: "4.1%", niche: "Comedy", campaign: "Brand Awareness Q1", appliedAt: "5 days ago", status: "rejected" },
-];
+import { useQuery } from "@tanstack/react-query";
+import { applicationService } from "@/services/api";
+import { supabase } from "@/lib/supabase";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { formatDistanceToNow } from "date-fns";
+import { useAuth } from "@/contexts/AuthContext";
 
 const statusColors: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-700",
   approved: "bg-green-100 text-green-700",
   rejected: "bg-red-100 text-red-700",
+  withdrawn: "bg-gray-100 text-gray-700",
 };
 
 const AdminApplications = () => {
+  const { user } = useAuth();
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const { data: rawApplications, isLoading, refetch } = useQuery({
+    queryKey: ['adminApplications'],
+    queryFn: applicationService.getAdminApplications,
+  });
+
+  // Real-time subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-applications-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'campaign_applications' },
+        (payload) => {
+          // toast.info("Applications updated"); // Optional: notify on update
+          refetch();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refetch]);
+
+  const handleReviewApplication = async (appId: string, status: 'approved' | 'rejected') => {
+    if (!user) return;
+    try {
+      await applicationService.reviewApplication(appId, status, user.id);
+      toast.success(`Application ${status}`);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to update application");
+    }
+  };
+
+  const applications = rawApplications?.map((app: any) => ({
+    id: app.id,
+    name: app.influencer?.full_name || 'Unknown',
+    email: app.influencer?.email || '',
+    platform: app.influencer?.influencer_profile?.primary_platform || 'N/A',
+    followers: app.influencer?.influencer_profile?.total_followers ? app.influencer.influencer_profile.total_followers.toLocaleString() : 'N/A',
+    engagement: app.influencer?.influencer_profile?.engagement_rate ? `${app.influencer.influencer_profile.engagement_rate}%` : 'N/A',
+    niche: app.influencer?.influencer_profile?.niche?.[0] || 'General',
+    campaign: app.campaign?.title || 'Unknown Campaign',
+    appliedAt: formatDistanceToNow(new Date(app.created_at), { addSuffix: true }),
+    status: app.status
+  })) || [];
+
+  const filteredApplications = applications.filter(app =>
+    app.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    app.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    app.campaign.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (isLoading) {
+    return (
+      <DashboardLayout userType="admin">
+        <div className="flex items-center justify-center h-[50vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-coral" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout userType="admin">
       <div className="space-y-8">
@@ -33,7 +99,12 @@ const AdminApplications = () => {
           </div>
           <div className="relative sm:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input placeholder="Search applications..." className="pl-10" />
+            <Input
+              placeholder="Search applications..."
+              className="pl-10"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
         </div>
 
@@ -54,7 +125,7 @@ const AdminApplications = () => {
           {["pending", "approved", "rejected", "all"].map((tab) => (
             <TabsContent key={tab} value={tab}>
               <div className="space-y-4">
-                {applications
+                {filteredApplications
                   .filter(a => tab === "all" || a.status === tab)
                   .map((app, index) => (
                     <motion.div key={app.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }}>
@@ -64,7 +135,7 @@ const AdminApplications = () => {
                             <div className="flex items-start gap-4">
                               <div className="w-12 h-12 rounded-full bg-coral/10 flex items-center justify-center shrink-0">
                                 <span className="font-semibold text-coral">
-                                  {app.name.split(" ").map(n => n[0]).join("")}
+                                  {app.name.split(" ").map((n: string) => n[0]).join("")}
                                 </span>
                               </div>
                               <div className="space-y-1">
@@ -87,11 +158,11 @@ const AdminApplications = () => {
                             <div className="flex flex-col gap-2 shrink-0">
                               {app.status === "pending" && (
                                 <>
-                                  <Button size="sm" variant="coral">
+                                  <Button size="sm" variant="coral" onClick={() => handleReviewApplication(app.id, 'approved')}>
                                     <UserCheck className="w-4 h-4 mr-1" />
                                     Approve
                                   </Button>
-                                  <Button size="sm" variant="outline" className="text-red-600">
+                                  <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleReviewApplication(app.id, 'rejected')}>
                                     <UserX className="w-4 h-4 mr-1" />
                                     Reject
                                   </Button>
@@ -107,6 +178,11 @@ const AdminApplications = () => {
                       </Card>
                     </motion.div>
                   ))}
+                {filteredApplications.filter(a => tab === "all" || a.status === tab).length === 0 && (
+                  <div className="text-center py-10 text-muted-foreground">
+                    No applications found.
+                  </div>
+                )}
               </div>
             </TabsContent>
           ))}

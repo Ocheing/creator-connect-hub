@@ -1,32 +1,16 @@
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { motion } from "framer-motion";
-import { DollarSign, TrendingUp, ArrowUpRight, Download, Percent } from "lucide-react";
+import { DollarSign, TrendingUp, ArrowUpRight, Download, Percent, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-const stats = [
-  { label: "Total Revenue", value: "KSh 3,195,000", change: "+18.5%", icon: DollarSign },
-  { label: "Brand Payments", value: "KSh 15,975,000", change: "+22%", icon: TrendingUp },
-  { label: "Influencer Payouts", value: "KSh 12,780,000", change: "+20%", icon: ArrowUpRight },
-  { label: "Commission (20%)", value: "KSh 3,195,000", change: "20% rate", icon: Percent },
-];
-
-const brandPayments = [
-  { id: "1", brand: "Organic Skincare Co.", campaign: "Summer Product Launch", amount: "KSh 390,000", commission: "KSh 78,000", status: "completed", date: "Feb 12, 2024" },
-  { id: "2", brand: "TechStart App", campaign: "New Product Teaser", amount: "KSh 200,000", commission: "KSh 40,000", status: "completed", date: "Feb 10, 2024" },
-  { id: "3", brand: "FitLife Supplements", campaign: "Fitness Challenge", amount: "KSh 500,000", commission: "KSh 100,000", status: "pending", date: "Feb 8, 2024" },
-  { id: "4", brand: "GreenHome Kenya", campaign: "Brand Awareness Q1", amount: "KSh 650,000", commission: "KSh 130,000", status: "completed", date: "Feb 1, 2024" },
-];
-
-const influencerPayouts = [
-  { id: "1", influencer: "Sarah Chen", campaign: "Summer Product Launch", amount: "KSh 55,000", status: "completed", date: "Feb 12, 2024", method: "M-Pesa" },
-  { id: "2", influencer: "Marcus Johnson", campaign: "Summer Product Launch", amount: "KSh 40,000", status: "completed", date: "Feb 10, 2024", method: "Bank Transfer" },
-  { id: "3", influencer: "James Mwangi", campaign: "New Product Teaser", amount: "KSh 70,000", status: "processing", date: "Feb 8, 2024", method: "M-Pesa" },
-  { id: "4", influencer: "Emma Rodriguez", campaign: "Brand Awareness Q1", amount: "KSh 65,000", status: "pending", date: "Feb 5, 2024", method: "Bank Transfer" },
-  { id: "5", influencer: "Amina Hassan", campaign: "Brand Awareness Q1", amount: "KSh 50,000", status: "completed", date: "Feb 3, 2024", method: "M-Pesa" },
-];
+import { useQuery } from "@tanstack/react-query";
+import { paymentService } from "@/services/api";
+import { supabase } from "@/lib/supabase";
+import { useEffect } from "react";
+import { format } from "date-fns";
+import { toast } from "sonner";
 
 const statusColors: Record<string, string> = {
   completed: "bg-green-100 text-green-700",
@@ -36,6 +20,93 @@ const statusColors: Record<string, string> = {
 };
 
 const AdminFinances = () => {
+  const { data: payments, isLoading: isLoadingPayments, refetch: refetchPayments } = useQuery({
+    queryKey: ['adminPayments'],
+    queryFn: paymentService.getAdminPayments,
+  });
+
+  const { data: payouts, isLoading: isLoadingPayouts, refetch: refetchPayouts } = useQuery({
+    queryKey: ['adminPayouts'],
+    queryFn: paymentService.getAdminPayouts,
+  });
+
+  useEffect(() => {
+    const paymentChannel = supabase
+      .channel('admin-payments-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'payments' },
+        () => refetchPayments()
+      )
+      .subscribe();
+
+    const payoutChannel = supabase
+      .channel('admin-payouts-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'payouts' },
+        () => refetchPayouts()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(paymentChannel);
+      supabase.removeChannel(payoutChannel);
+    };
+  }, [refetchPayments, refetchPayouts]);
+
+  const handleProcessPayout = async (payoutId: string) => {
+    try {
+      await paymentService.processPayout(payoutId, 'processing');
+      toast.success("Payout processing started");
+    } catch (error) {
+      toast.error("Failed to process payout");
+      console.error(error);
+    }
+  };
+
+  const brandPayments = payments?.map((p: any) => ({
+    id: p.id,
+    brand: p.brand?.company_name || 'Unknown Brand',
+    campaign: p.campaign?.title || 'Unknown Campaign',
+    amount: `KSh ${p.amount.toLocaleString()}`,
+    commission: `KSh ${p.commission_amount?.toLocaleString() || 0}`,
+    status: p.status,
+    date: p.created_at ? format(new Date(p.created_at), 'MMM d, yyyy') : 'N/A'
+  })) || [];
+
+  const influencerPayouts = payouts?.map((p: any) => ({
+    id: p.id,
+    influencer: p.influencer?.full_name || 'Unknown',
+    campaign: p.match?.campaign?.title || 'Unknown Campaign',
+    amount: `KSh ${p.amount.toLocaleString()}`,
+    method: p.payout_method || 'N/A',
+    status: p.status,
+    date: p.created_at ? format(new Date(p.created_at), 'MMM d, yyyy') : 'N/A'
+  })) || [];
+
+  // Calculate dynamic stats
+  const totalRevenue = payments?.reduce((sum: number, p: any) => sum + (p.status === 'completed' ? p.commission_amount : 0), 0) || 0;
+  const totalBrandPayments = payments?.reduce((sum: number, p: any) => sum + (p.status === 'completed' ? p.amount : 0), 0) || 0;
+  const totalInfluencerPayouts = payouts?.reduce((sum: number, p: any) => sum + (p.status === 'completed' ? p.amount : 0), 0) || 0;
+
+  const stats = [
+    { label: "Total Revenue", value: `KSh ${totalRevenue.toLocaleString()}`, change: "All time", icon: DollarSign },
+    { label: "Brand Payments", value: `KSh ${totalBrandPayments.toLocaleString()}`, change: "All time", icon: TrendingUp },
+    { label: "Influencer Payouts", value: `KSh ${totalInfluencerPayouts.toLocaleString()}`, change: "All time", icon: ArrowUpRight },
+    { label: "Commission (20%)", value: `KSh ${totalRevenue.toLocaleString()}`, change: "20% rate", icon: Percent },
+  ];
+
+  if (isLoadingPayments || isLoadingPayouts) {
+    return (
+      <DashboardLayout userType="admin">
+        <div className="flex items-center justify-center h-[50vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-coral" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout userType="admin">
       <div className="space-y-8">
@@ -80,30 +151,34 @@ const AdminFinances = () => {
               <CardHeader><CardTitle>Brand Payments</CardTitle></CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Brand</th>
-                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Campaign</th>
-                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Amount</th>
-                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Commission</th>
-                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Date</th>
-                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {brandPayments.map((p) => (
-                        <tr key={p.id} className="border-b border-border/50 hover:bg-muted/30">
-                          <td className="py-3 px-4 font-medium">{p.brand}</td>
-                          <td className="py-3 px-4 text-muted-foreground">{p.campaign}</td>
-                          <td className="py-3 px-4 font-semibold">{p.amount}</td>
-                          <td className="py-3 px-4 text-coral font-medium">{p.commission}</td>
-                          <td className="py-3 px-4 text-muted-foreground">{p.date}</td>
-                          <td className="py-3 px-4"><Badge className={`border-0 ${statusColors[p.status]}`}>{p.status}</Badge></td>
+                  {brandPayments.length > 0 ? (
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Brand</th>
+                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Campaign</th>
+                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Amount</th>
+                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Commission</th>
+                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Date</th>
+                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {brandPayments.map((p) => (
+                          <tr key={p.id} className="border-b border-border/50 hover:bg-muted/30">
+                            <td className="py-3 px-4 font-medium">{p.brand}</td>
+                            <td className="py-3 px-4 text-muted-foreground">{p.campaign}</td>
+                            <td className="py-3 px-4 font-semibold">{p.amount}</td>
+                            <td className="py-3 px-4 text-coral font-medium">{p.commission}</td>
+                            <td className="py-3 px-4 text-muted-foreground">{p.date}</td>
+                            <td className="py-3 px-4"><Badge className={`border-0 ${statusColors[p.status]}`}>{p.status}</Badge></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">No payments found.</div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -114,36 +189,40 @@ const AdminFinances = () => {
               <CardHeader><CardTitle>Influencer Payouts</CardTitle></CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Influencer</th>
-                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Campaign</th>
-                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Amount</th>
-                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Method</th>
-                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Date</th>
-                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
-                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {influencerPayouts.map((p) => (
-                        <tr key={p.id} className="border-b border-border/50 hover:bg-muted/30">
-                          <td className="py-3 px-4 font-medium">{p.influencer}</td>
-                          <td className="py-3 px-4 text-muted-foreground">{p.campaign}</td>
-                          <td className="py-3 px-4 font-semibold">{p.amount}</td>
-                          <td className="py-3 px-4 text-muted-foreground">{p.method}</td>
-                          <td className="py-3 px-4 text-muted-foreground">{p.date}</td>
-                          <td className="py-3 px-4"><Badge className={`border-0 ${statusColors[p.status]}`}>{p.status}</Badge></td>
-                          <td className="py-3 px-4">
-                            {(p.status === "pending" || p.status === "processing") && (
-                              <Button size="sm" variant="coral" className="text-xs h-7">Process</Button>
-                            )}
-                          </td>
+                  {influencerPayouts.length > 0 ? (
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Influencer</th>
+                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Campaign</th>
+                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Amount</th>
+                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Method</th>
+                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Date</th>
+                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
+                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Action</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {influencerPayouts.map((p) => (
+                          <tr key={p.id} className="border-b border-border/50 hover:bg-muted/30">
+                            <td className="py-3 px-4 font-medium">{p.influencer}</td>
+                            <td className="py-3 px-4 text-muted-foreground">{p.campaign}</td>
+                            <td className="py-3 px-4 font-semibold">{p.amount}</td>
+                            <td className="py-3 px-4 text-muted-foreground">{p.method}</td>
+                            <td className="py-3 px-4 text-muted-foreground">{p.date}</td>
+                            <td className="py-3 px-4"><Badge className={`border-0 ${statusColors[p.status]}`}>{p.status}</Badge></td>
+                            <td className="py-3 px-4">
+                              {(p.status === "pending" || p.status === "processing") && (
+                                <Button size="sm" variant="coral" className="text-xs h-7" onClick={() => handleProcessPayout(p.id)}>Process</Button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">No payouts found.</div>
+                  )}
                 </div>
               </CardContent>
             </Card>

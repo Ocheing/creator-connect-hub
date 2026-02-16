@@ -1,19 +1,18 @@
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { motion } from "framer-motion";
-import { Briefcase, Users, DollarSign, Calendar, Eye, MoreVertical } from "lucide-react";
+import { Briefcase, Users, DollarSign, Calendar, Eye, MoreVertical, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-const campaigns = [
-  { id: "1", name: "Summer Product Launch", brand: "Organic Skincare Co.", status: "active", budget: "KSh 390,000", spent: 65, influencers: 5, applications: 12, startDate: "Feb 1", endDate: "Mar 15" },
-  { id: "2", name: "New Product Teaser", brand: "TechStart App", status: "active", budget: "KSh 200,000", spent: 30, influencers: 3, applications: 8, startDate: "Feb 10", endDate: "Mar 10" },
-  { id: "3", name: "Fitness Challenge", brand: "FitLife Supplements", status: "pending_approval", budget: "KSh 500,000", spent: 0, influencers: 0, applications: 0, startDate: "Mar 1", endDate: "Apr 1" },
-  { id: "4", name: "Brand Awareness Q1", brand: "GreenHome Kenya", status: "completed", budget: "KSh 650,000", spent: 100, influencers: 8, applications: 25, startDate: "Jan 1", endDate: "Feb 1" },
-  { id: "5", name: "Holiday Gift Guide", brand: "Craft Market KE", status: "draft", budget: "KSh 325,000", spent: 0, influencers: 0, applications: 0, startDate: "Mar 1", endDate: "Apr 15" },
-];
+import { useQuery } from "@tanstack/react-query";
+import { campaignService } from "@/services/api";
+import { supabase } from "@/lib/supabase";
+import { useEffect, useState } from "react";
+import { format } from "date-fns";
+import { Input } from "@/components/ui/input";
+import { Search } from "lucide-react";
 
 const statusColors: Record<string, string> = {
   active: "bg-green-100 text-green-700",
@@ -24,12 +23,77 @@ const statusColors: Record<string, string> = {
 };
 
 const AdminCampaigns = () => {
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const { data: rawCampaigns, isLoading, refetch } = useQuery({
+    queryKey: ['adminCampaigns'],
+    queryFn: campaignService.getAdminCampaigns,
+  });
+
+  // Real-time subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-campaigns-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'campaigns' },
+        (payload) => {
+          refetch();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refetch]);
+
+  const campaigns = rawCampaigns?.map((c: any) => ({
+    id: c.id,
+    name: c.title,
+    brand: c.brand_profile?.company_name || 'Unknown Brand',
+    status: c.status,
+    budget: `KSh ${c.budget.toLocaleString()}`,
+    budgetVal: c.budget,
+    spent: c.budget > 0 ? ((c.budget_spent || 0) / c.budget) * 100 : 0,
+    influencers: c.matched_influencers || 0,
+    applications: c.applications?.[0]?.count || 0,
+    startDate: c.start_date ? format(new Date(c.start_date), 'MMM d') : 'TBD',
+    endDate: c.end_date ? format(new Date(c.end_date), 'MMM d') : 'TBD',
+  })) || [];
+
+  const filteredCampaigns = campaigns.filter(c =>
+    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.brand.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (isLoading) {
+    return (
+      <DashboardLayout userType="admin">
+        <div className="flex items-center justify-center h-[50vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-coral" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout userType="admin">
       <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-heading font-bold mb-2">Campaign Management</h1>
-          <p className="text-muted-foreground">View and manage all platform campaigns.</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-heading font-bold mb-2">Campaign Management</h1>
+            <p className="text-muted-foreground">View and manage all platform campaigns.</p>
+          </div>
+          <div className="relative sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search campaigns..."
+              className="pl-10"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         </div>
 
         <div className="grid sm:grid-cols-4 gap-4">
@@ -50,7 +114,7 @@ const AdminCampaigns = () => {
           {["all", "active", "pending_approval", "completed"].map((tab) => (
             <TabsContent key={tab} value={tab}>
               <div className="space-y-4">
-                {campaigns
+                {filteredCampaigns
                   .filter(c => tab === "all" || c.status === tab)
                   .map((campaign, index) => (
                     <motion.div key={campaign.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }}>
@@ -73,7 +137,7 @@ const AdminCampaigns = () => {
                               </div>
                               {campaign.spent > 0 && (
                                 <div className="max-w-sm">
-                                  <div className="flex justify-between text-xs mb-1"><span>Budget Used</span><span>{campaign.spent}%</span></div>
+                                  <div className="flex justify-between text-xs mb-1"><span>Budget Used</span><span>{Math.round(campaign.spent)}%</span></div>
                                   <Progress value={campaign.spent} className="h-1.5" />
                                 </div>
                               )}
@@ -92,6 +156,11 @@ const AdminCampaigns = () => {
                       </Card>
                     </motion.div>
                   ))}
+                {filteredCampaigns.filter(c => tab === "all" || c.status === tab).length === 0 && (
+                  <div className="text-center py-10 text-muted-foreground">
+                    No campaigns found.
+                  </div>
+                )}
               </div>
             </TabsContent>
           ))}
