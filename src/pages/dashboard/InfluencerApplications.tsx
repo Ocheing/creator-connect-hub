@@ -1,4 +1,5 @@
 import { useMemo, useEffect } from "react";
+import { Link } from "react-router-dom";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { motion } from "framer-motion";
 import { FileText, Clock, CheckCircle, XCircle, ExternalLink, AlertCircle, Loader2 } from "lucide-react";
@@ -181,10 +182,11 @@ const InfluencerApplications = () => {
                                 )}
                               </div>
                               <div className="flex gap-2">
-                                {/* Future: Link to campaign details page */}
-                                <Button variant="outline" size="sm">
-                                  <ExternalLink className="w-4 h-4 mr-1" />
-                                  View Campaign
+                                <Button variant="outline" size="sm" asChild>
+                                  <Link to={`/dashboard/campaigns/${app.campaign.id}`}>
+                                    <ExternalLink className="w-4 h-4 mr-1" />
+                                    View Campaign
+                                  </Link>
                                 </Button>
                                 {app.status === "pending" && (
                                   <Button

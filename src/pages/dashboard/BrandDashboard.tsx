@@ -156,9 +156,18 @@ const BrandDashboard = () => {
                           <span className="text-muted-foreground">
                             Budget: KSh {campaign.budget.toLocaleString()}
                           </span>
-                          <span>{Math.round(((campaign.budget_spent || 0) / campaign.budget) * 100)}% spent</span>
+                          <span>
+                            {campaign.budget > 0
+                              ? Math.round(((campaign.budget_spent || 0) / campaign.budget) * 100)
+                              : 0}% spent
+                          </span>
                         </div>
-                        <Progress value={((campaign.budget_spent || 0) / campaign.budget) * 100} className="h-2 mt-2" />
+                        <Progress
+                          value={campaign.budget > 0
+                            ? ((campaign.budget_spent || 0) / campaign.budget) * 100
+                            : 0}
+                          className="h-2 mt-2"
+                        />
                       </div>
                     ))}
                   </div>
@@ -183,7 +192,7 @@ const BrandDashboard = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <Button variant="outline" className="w-full justify-start" asChild>
-                  <Link to="/dashboard/search">
+                  <Link to="/dashboard/influencers">
                     <Eye className="w-4 h-4 mr-2" />
                     Browse Influencers
                   </Link>

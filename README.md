@@ -1,73 +1,94 @@
-# Welcome to your Lovable project
+# Creator Connect Hub (MicroMatch)
 
-## Project info
+A micro-influencer marketing platform that connects brands with authentic creators (1K–10K followers) for impactful marketing campaigns.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Tech Stack
 
-## How can I edit this code?
+- **Frontend:** React 18, TypeScript, Vite
+- **Styling:** Tailwind CSS, shadcn/ui components
+- **Backend:** Supabase (Auth, Database, Storage, Real-time)
+- **State Management:** TanStack React Query
+- **Routing:** React Router v6
+- **Animation:** Framer Motion
 
-There are several ways of editing your application.
+## Getting Started
 
-**Use Lovable**
+### Prerequisites
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+- Node.js 18+ and npm
+- A [Supabase](https://supabase.com) project with the migrations applied
 
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+### Installation
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
+# Clone the repository
 git clone <YOUR_GIT_URL>
+cd creator-connect-hub
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Install dependencies
+npm install
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your Supabase URL and anon key
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start the development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Database Setup
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Run the SQL migrations in order against your Supabase instance:
 
-**Use GitHub Codespaces**
+```
+supabase/migrations/001_schema.sql
+supabase/migrations/002_rls_policies.sql
+supabase/migrations/003_storage.sql
+supabase/migrations/005_categories.sql
+supabase/migrations/006_success_stories.sql
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Available Scripts
 
-## What technologies are used for this project?
+| Command          | Description                        |
+| ---------------- | ---------------------------------- |
+| `npm run dev`    | Start the dev server (port 8080)   |
+| `npm run build`  | Production build                   |
+| `npm run preview`| Preview the production build       |
+| `npm run lint`   | Lint with ESLint                   |
+| `npm run test`   | Run tests with Vitest              |
 
-This project is built with:
+## Project Structure
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+```
+src/
+├── components/     # Reusable UI components
+│   ├── auth/       # Auth guards (ProtectedRoute, etc.)
+│   ├── dashboard/  # Dashboard layout & widgets
+│   ├── home/       # Landing page sections
+│   ├── layout/     # Global layout (Header, Footer)
+│   └── ui/         # shadcn/ui primitives
+├── contexts/       # React context providers (Auth)
+├── hooks/          # Custom hooks
+├── lib/            # Utilities (supabase client, utils)
+├── pages/          # Route pages
+│   ├── admin/      # Admin panel pages
+│   └── dashboard/  # User dashboard pages
+├── services/       # API service layer (Supabase queries)
+└── types/          # TypeScript type definitions
+```
 
-## How can I deploy this project?
+## Deployment
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+Build the production bundle and deploy to any static hosting provider:
 
-## Can I connect a custom domain to my Lovable project?
+```sh
+npm run build
+# Deploy the `dist/` directory
+```
 
-Yes, you can!
+Compatible with Vercel, Netlify, Cloudflare Pages, or any static host.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## License
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Private — All rights reserved.

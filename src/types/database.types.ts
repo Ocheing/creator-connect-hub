@@ -306,6 +306,81 @@ export interface Lead {
     updated_at: string;
 }
 
+export interface Category {
+    id: string;
+    name: string;
+    slug: string;
+    description: string | null;
+    icon: string | null;
+    parent_id: string | null;
+    is_active: boolean;
+    display_order: number;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface CampaignCategory {
+    id: string;
+    campaign_id: string;
+    category_id: string;
+    created_at: string;
+}
+
+export interface InfluencerCategory {
+    id: string;
+    influencer_id: string;
+    category_id: string;
+    created_at: string;
+}
+
+// Result type from get_matching_campaigns RPC
+export interface MatchingCampaign {
+    campaign_id: string;
+    title: string;
+    description: string | null;
+    budget: number;
+    cost_per_influencer: number;
+    max_influencers: number;
+    matched_influencers: number;
+    status: CampaignStatus;
+    start_date: string | null;
+    end_date: string | null;
+    application_deadline: string | null;
+    brand_id: string;
+    brand_name: string | null;
+    brand_logo: string | null;
+    target_platforms: SocialPlatform[];
+    match_score: number;
+    matching_categories: string[];
+    total_categories: number;
+    created_at: string;
+}
+
+export interface CategoryStats {
+    category_id: string;
+    category_name: string;
+    category_slug: string;
+    campaign_count: number;
+    influencer_count: number;
+}
+
+export interface SuccessStory {
+    id: string;
+    brand_name: string;
+    industry: string;
+    result: string;
+    description: string;
+    stat_influencers: number;
+    stat_reach: string;
+    stat_engagement: string;
+    cover_image_url: string | null;
+    is_published: boolean;
+    is_featured: boolean;
+    display_order: number;
+    created_at: string;
+    updated_at: string;
+}
+
 // ────────────────────────────────────────────────────────
 // Dashboard Stats Types
 // ────────────────────────────────────────────────────────
@@ -367,6 +442,15 @@ export type TestimonialInsert = Omit<Testimonial, 'id' | 'created_at' | 'updated
 export type TestimonialUpdate = Partial<Omit<Testimonial, 'id' | 'created_at' | 'updated_at'>>;
 
 export type LeadInsert = Pick<Lead, 'type' | 'email'> & Partial<Omit<Lead, 'id' | 'is_spam' | 'is_processed' | 'processed_by' | 'processed_at' | 'created_at' | 'updated_at'>>;
+
+export type CategoryInsert = Omit<Category, 'id' | 'slug' | 'created_at' | 'updated_at'>;
+export type CategoryUpdate = Partial<Omit<Category, 'id' | 'slug' | 'created_at' | 'updated_at'>>;
+
+export type CampaignCategoryInsert = Omit<CampaignCategory, 'id' | 'created_at'>;
+export type InfluencerCategoryInsert = Omit<InfluencerCategory, 'id' | 'created_at'>;
+
+export type SuccessStoryInsert = Omit<SuccessStory, 'id' | 'created_at' | 'updated_at'>;
+export type SuccessStoryUpdate = Partial<Omit<SuccessStory, 'id' | 'created_at' | 'updated_at'>>;
 
 // ────────────────────────────────────────────────────────
 // Supabase Database Type (used by createClient<Database>)
@@ -965,6 +1049,72 @@ export interface Database {
                 };
                 Relationships: [];
             };
+            categories: {
+                Row: Category;
+                Insert: {
+                    id?: string;
+                    name: string;
+                    slug?: string;
+                    description?: string | null;
+                    icon?: string | null;
+                    parent_id?: string | null;
+                    is_active?: boolean;
+                    display_order?: number;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Update: {
+                    id?: string;
+                    name?: string;
+                    slug?: string;
+                    description?: string | null;
+                    icon?: string | null;
+                    parent_id?: string | null;
+                    is_active?: boolean;
+                    display_order?: number;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Relationships: [{ foreignKeyName: 'categories_parent_id_fkey'; columns: ['parent_id']; referencedRelation: 'categories'; referencedColumns: ['id'] }];
+            };
+            campaign_categories: {
+                Row: CampaignCategory;
+                Insert: {
+                    id?: string;
+                    campaign_id: string;
+                    category_id: string;
+                    created_at?: string;
+                };
+                Update: {
+                    id?: string;
+                    campaign_id?: string;
+                    category_id?: string;
+                    created_at?: string;
+                };
+                Relationships: [
+                    { foreignKeyName: 'campaign_categories_campaign_id_fkey'; columns: ['campaign_id']; referencedRelation: 'campaigns'; referencedColumns: ['id'] },
+                    { foreignKeyName: 'campaign_categories_category_id_fkey'; columns: ['category_id']; referencedRelation: 'categories'; referencedColumns: ['id'] }
+                ];
+            };
+            influencer_categories: {
+                Row: InfluencerCategory;
+                Insert: {
+                    id?: string;
+                    influencer_id: string;
+                    category_id: string;
+                    created_at?: string;
+                };
+                Update: {
+                    id?: string;
+                    influencer_id?: string;
+                    category_id?: string;
+                    created_at?: string;
+                };
+                Relationships: [
+                    { foreignKeyName: 'influencer_categories_influencer_id_fkey'; columns: ['influencer_id']; referencedRelation: 'profiles'; referencedColumns: ['id'] },
+                    { foreignKeyName: 'influencer_categories_category_id_fkey'; columns: ['category_id']; referencedRelation: 'categories'; referencedColumns: ['id'] }
+                ];
+            };
         };
         Views: {};
         Functions: {
@@ -1028,6 +1178,14 @@ export interface Database {
             demote_admin: {
                 Args: { p_user_id: string; p_new_role?: UserRole };
                 Returns: void;
+            };
+            get_matching_campaigns: {
+                Args: { p_influencer_id: string; p_page?: number; p_page_size?: number };
+                Returns: MatchingCampaign[];
+            };
+            get_category_stats: {
+                Args: Record<string, never>;
+                Returns: CategoryStats[];
             };
         };
         CompositeTypes: {};

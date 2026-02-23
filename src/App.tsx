@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import ScrollToTop from "@/components/ScrollToTop";
 import { AuthProvider } from "@/contexts/AuthContext";
 import {
   ProtectedRoute,
@@ -24,10 +25,12 @@ const About = lazy(() => import("./pages/About"));
 const Blog = lazy(() => import("./pages/Blog"));
 const SignIn = lazy(() => import("./pages/SignIn"));
 const SignUp = lazy(() => import("./pages/SignUp"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 
 // Dashboard Pages
 const InfluencerDashboard = lazy(() => import("./pages/dashboard/InfluencerDashboard"));
 const InfluencerApplications = lazy(() => import("./pages/dashboard/InfluencerApplications"));
+const InfluencerDiscover = lazy(() => import("./pages/dashboard/InfluencerDiscover"));
 const InfluencerDeals = lazy(() => import("./pages/dashboard/InfluencerDeals"));
 const InfluencerEarnings = lazy(() => import("./pages/dashboard/InfluencerEarnings"));
 const Messages = lazy(() => import("./pages/dashboard/Messages"));
@@ -36,6 +39,8 @@ const BrandDashboard = lazy(() => import("./pages/dashboard/BrandDashboard"));
 const BrandCampaigns = lazy(() => import("./pages/dashboard/BrandCampaigns"));
 const BrandInfluencers = lazy(() => import("./pages/dashboard/BrandInfluencers"));
 const BrandBudget = lazy(() => import("./pages/dashboard/BrandBudget"));
+const CreateCampaign = lazy(() => import("./pages/dashboard/CreateCampaign"));
+const CampaignDetails = lazy(() => import("./pages/dashboard/CampaignDetails"));
 
 // Admin Pages
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
@@ -45,6 +50,7 @@ const AdminApplications = lazy(() => import("./pages/admin/AdminApplications"));
 const AdminFinances = lazy(() => import("./pages/admin/AdminFinances"));
 const ContentManagement = lazy(() => import("./pages/admin/ContentManagement"));
 const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
+const AdminCategories = lazy(() => import("./pages/admin/AdminCategories"));
 
 // Error Pages
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -53,6 +59,7 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 2 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,   // keep cache 10 min so back-nav is instant
       retry: 1,
       refetchOnWindowFocus: false,
     },
@@ -71,6 +78,7 @@ const App = () => (
             v7_relativeSplatPath: true,
           }}
         >
+          <ScrollToTop />
           <Routes>
             {/* ── Public Routes ── */}
             <Route path="/" element={<Suspense fallback={<LoadingSpinner />}><Index /></Suspense>} />
@@ -79,6 +87,7 @@ const App = () => (
             <Route path="/for-brands" element={<Suspense fallback={<LoadingSpinner />}><ForBrands /></Suspense>} />
             <Route path="/about" element={<Suspense fallback={<LoadingSpinner />}><About /></Suspense>} />
             <Route path="/blog" element={<Suspense fallback={<LoadingSpinner />}><Blog /></Suspense>} />
+            <Route path="/reset-password" element={<Suspense fallback={<LoadingSpinner />}><ResetPassword /></Suspense>} />
 
             {/* ── Auth Routes (redirect if already logged in) ── */}
             <Route
@@ -112,6 +121,14 @@ const App = () => (
               element={
                 <InfluencerRoute>
                   <Suspense fallback={<LoadingSpinner />}><InfluencerApplications /></Suspense>
+                </InfluencerRoute>
+              }
+            />
+            <Route
+              path="/dashboard/discover"
+              element={
+                <InfluencerRoute>
+                  <Suspense fallback={<LoadingSpinner />}><InfluencerDiscover /></Suspense>
                 </InfluencerRoute>
               }
             />
@@ -155,6 +172,22 @@ const App = () => (
                 <BrandRoute>
                   <Suspense fallback={<LoadingSpinner />}><BrandDashboard /></Suspense>
                 </BrandRoute>
+              }
+            />
+            <Route
+              path="/dashboard/campaigns/new"
+              element={
+                <BrandRoute>
+                  <Suspense fallback={<LoadingSpinner />}><CreateCampaign /></Suspense>
+                </BrandRoute>
+              }
+            />
+            <Route
+              path="/dashboard/campaigns/:id"
+              element={
+                <ProtectedRoute allowedRoles={['influencer', 'brand', 'admin']}>
+                  <Suspense fallback={<LoadingSpinner />}><CampaignDetails /></Suspense>
+                </ProtectedRoute>
               }
             />
             <Route
@@ -236,6 +269,14 @@ const App = () => (
               element={
                 <AdminRoute>
                   <Suspense fallback={<LoadingSpinner />}><AdminSettings /></Suspense>
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/categories"
+              element={
+                <AdminRoute>
+                  <Suspense fallback={<LoadingSpinner />}><AdminCategories /></Suspense>
                 </AdminRoute>
               }
             />

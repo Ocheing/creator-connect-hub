@@ -1,4 +1,5 @@
 import { useMemo, useEffect } from "react";
+import { Link } from "react-router-dom";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { motion } from "framer-motion";
 import { Briefcase, Calendar, DollarSign, CheckCircle, Clock, Play, AlertCircle, Loader2 } from "lucide-react";
@@ -186,7 +187,9 @@ const InfluencerDeals = () => {
                           </div>
                         )}
                       </div>
-                      <Button variant="outline" size="sm">View Details</Button>
+                      <Button variant="outline" size="sm" asChild>
+                        <Link to={`/dashboard/campaigns/${deal.campaign.id}`}>View Details</Link>
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>

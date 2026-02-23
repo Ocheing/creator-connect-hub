@@ -28,7 +28,7 @@ const values = [
 
 const team = [
   {
-    name: "Maya Chen",
+    name: "CHRIS GITONGA",
     role: "Founder & CEO",
     image: founderImage,
     bio: "Former micro-influencer turned entrepreneur. Passionate about helping small creators thrive.",
@@ -90,11 +90,11 @@ const About = () => {
               <div className="relative">
                 <img
                   src={founderImage}
-                  alt="Maya Chen, Founder"
+                  alt="CHRIS GITONGA, Founder"
                   className="rounded-2xl shadow-card-hover w-full max-w-md mx-auto"
                 />
                 <div className="absolute -bottom-6 -right-6 bg-coral text-primary-foreground rounded-xl p-4 shadow-coral">
-                  <p className="font-heading font-bold text-2xl">2021</p>
+                  <p className="font-heading font-bold text-2xl">2026</p>
                   <p className="text-sm">Founded</p>
                 </div>
               </div>
@@ -123,7 +123,7 @@ const About = () => {
                 </p>
               </div>
               <p className="mt-6 font-heading font-semibold text-lg">
-                — Maya Chen, Founder & CEO
+                — CHRIS GITONGA, Founder & CEO
               </p>
             </motion.div>
           </div>

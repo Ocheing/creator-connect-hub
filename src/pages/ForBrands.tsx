@@ -1,13 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { motion } from "framer-motion";
-import { TrendingUp, Users, Target, ShieldCheck, ArrowRight, CheckCircle } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { TrendingUp, Users, Target, ShieldCheck, ArrowRight, CheckCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+import { successStoryService, categoryService } from "@/services/api";
+import { supabase } from "@/lib/supabase";
+import type { SuccessStory } from "@/types/database.types";
 
 const benefits = [
   {
@@ -32,30 +36,6 @@ const benefits = [
   },
 ];
 
-const caseStudies = [
-  {
-    brand: "Organic Skincare Co.",
-    industry: "Beauty",
-    result: "312% increase in website traffic",
-    description: "Partnered with 15 beauty micro-influencers for a product launch campaign.",
-    stats: { influencers: 15, reach: "180K", engagement: "8.2%" },
-  },
-  {
-    brand: "FitLife Supplements",
-    industry: "Health & Fitness",
-    result: "2.5x return on ad spend",
-    description: "Ambassador program with fitness creators driving consistent sales.",
-    stats: { influencers: 8, reach: "95K", engagement: "9.1%" },
-  },
-  {
-    brand: "TechStart App",
-    industry: "Technology",
-    result: "5,000+ app downloads",
-    description: "Tech reviewers showcasing app features to engaged audiences.",
-    stats: { influencers: 10, reach: "120K", engagement: "7.5%" },
-  },
-];
-
 const vettingProcess = [
   "Audience authenticity verification",
   "Engagement rate analysis",
@@ -68,6 +48,41 @@ const vettingProcess = [
 const ForBrands = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const { toast } = useToast();
+
+  // Fetch success stories dynamically
+  const {
+    data: successStories = [],
+    isLoading: storiesLoading,
+    refetch: refetchStories,
+  } = useQuery({
+    queryKey: ["success-stories"],
+    queryFn: () => successStoryService.getSuccessStories(true),
+  });
+
+  // Fetch categories for the industry dropdown
+  const { data: categories = [] } = useQuery({
+    queryKey: ["categories"],
+    queryFn: () => categoryService.getCategories(true),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Real-time subscription for success stories
+  useEffect(() => {
+    const channel = supabase
+      .channel("success-stories-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "success_stories" },
+        () => {
+          refetchStories();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refetchStories]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,7 +141,7 @@ const ForBrands = () => {
         </div>
       </section>
 
-      {/* Case Studies */}
+      {/* Success Stories — Dynamic */}
       <section className="py-16 lg:py-24 bg-muted/30">
         <div className="container mx-auto px-4">
           <motion.div
@@ -143,40 +158,25 @@ const ForBrands = () => {
             </p>
           </motion.div>
 
-          <div className="grid lg:grid-cols-3 gap-8">
-            {caseStudies.map((study, index) => (
-              <motion.div
-                key={study.brand}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                className="bg-card rounded-2xl p-6 border border-border"
-              >
-                <div className="inline-block px-3 py-1 bg-coral/10 text-coral text-sm font-medium rounded-full mb-4">
-                  {study.industry}
-                </div>
-                <h3 className="text-xl font-heading font-bold mb-2">{study.brand}</h3>
-                <p className="text-coral font-semibold text-lg mb-3">{study.result}</p>
-                <p className="text-muted-foreground text-sm mb-6">{study.description}</p>
-                
-                <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border">
-                  <div className="text-center">
-                    <p className="font-heading font-bold text-lg">{study.stats.influencers}</p>
-                    <p className="text-xs text-muted-foreground">Creators</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="font-heading font-bold text-lg">{study.stats.reach}</p>
-                    <p className="text-xs text-muted-foreground">Reach</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="font-heading font-bold text-lg">{study.stats.engagement}</p>
-                    <p className="text-xs text-muted-foreground">Engagement</p>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+          {storiesLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-coral" />
+            </div>
+          ) : successStories.length > 0 ? (
+            <div className="grid lg:grid-cols-3 gap-8">
+              <AnimatePresence mode="popLayout">
+                {successStories.map((story, index) => (
+                  <SuccessStoryCard key={story.id} story={story} index={index} />
+                ))}
+              </AnimatePresence>
+            </div>
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              <Users className="w-12 h-12 mx-auto mb-4 opacity-30" />
+              <p className="text-lg font-medium">Success stories coming soon!</p>
+              <p className="text-sm">Check back later for inspiring brand campaigns.</p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -195,7 +195,7 @@ const ForBrands = () => {
               <p className="text-lg text-muted-foreground mb-8">
                 We don't just match you with any creator. Every influencer in our network goes through a rigorous screening process.
               </p>
-              
+
               <div className="grid sm:grid-cols-2 gap-4">
                 {vettingProcess.map((item, index) => (
                   <motion.div
@@ -267,13 +267,23 @@ const ForBrands = () => {
                           <SelectValue placeholder="Select industry" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="beauty">Beauty & Skincare</SelectItem>
-                          <SelectItem value="fashion">Fashion & Apparel</SelectItem>
-                          <SelectItem value="food">Food & Beverage</SelectItem>
-                          <SelectItem value="tech">Technology</SelectItem>
-                          <SelectItem value="health">Health & Wellness</SelectItem>
-                          <SelectItem value="travel">Travel & Hospitality</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
+                          {categories.length > 0 ? (
+                            categories.map((cat) => (
+                              <SelectItem key={cat.id} value={cat.slug}>
+                                {cat.name}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <>
+                              <SelectItem value="beauty">Beauty & Skincare</SelectItem>
+                              <SelectItem value="fashion">Fashion & Apparel</SelectItem>
+                              <SelectItem value="food">Food & Beverage</SelectItem>
+                              <SelectItem value="tech">Technology</SelectItem>
+                              <SelectItem value="health">Health & Wellness</SelectItem>
+                              <SelectItem value="travel">Travel & Hospitality</SelectItem>
+                              <SelectItem value="other">Other</SelectItem>
+                            </>
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
@@ -314,5 +324,54 @@ const ForBrands = () => {
     </Layout>
   );
 };
+
+// ── Success Story Card ──────────────────────────────
+function SuccessStoryCard({ story, index }: { story: SuccessStory; index: number }) {
+  return (
+    <motion.div
+      key={story.id}
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      viewport={{ once: true }}
+      transition={{ delay: index * 0.1 }}
+      layout
+      className="bg-card rounded-2xl overflow-hidden border border-border hover:shadow-lg transition-shadow"
+    >
+      {story.cover_image_url && (
+        <div className="h-40 overflow-hidden">
+          <img
+            src={story.cover_image_url}
+            alt={story.brand_name}
+            className="w-full h-full object-cover"
+          />
+        </div>
+      )}
+      <div className="p-6">
+        <div className="inline-block px-3 py-1 bg-coral/10 text-coral text-sm font-medium rounded-full mb-4">
+          {story.industry}
+        </div>
+        <h3 className="text-xl font-heading font-bold mb-2">{story.brand_name}</h3>
+        <p className="text-coral font-semibold text-lg mb-3">{story.result}</p>
+        <p className="text-muted-foreground text-sm mb-6">{story.description}</p>
+
+        <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border">
+          <div className="text-center">
+            <p className="font-heading font-bold text-lg">{story.stat_influencers}</p>
+            <p className="text-xs text-muted-foreground">Creators</p>
+          </div>
+          <div className="text-center">
+            <p className="font-heading font-bold text-lg">{story.stat_reach}</p>
+            <p className="text-xs text-muted-foreground">Reach</p>
+          </div>
+          <div className="text-center">
+            <p className="font-heading font-bold text-lg">{story.stat_engagement}</p>
+            <p className="text-xs text-muted-foreground">Engagement</p>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
 export default ForBrands;

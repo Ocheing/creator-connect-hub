@@ -2,7 +2,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Sparkles, LayoutDashboard, Users, Briefcase, DollarSign,
   MessageSquare, Settings, LogOut, FileText, BarChart,
-  Eye, Shield, ChevronDown, Menu, X
+  Eye, Shield, ChevronDown, Menu, X, Compass, Tag
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -22,6 +22,7 @@ const DashboardLayout = ({ children, userType = "influencer" }: DashboardLayoutP
 
   const influencerNav = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Overview" },
+    { href: "/dashboard/discover", icon: Compass, label: "Discover" },
     { href: "/dashboard/applications", icon: FileText, label: "My Applications" },
     { href: "/dashboard/deals", icon: Briefcase, label: "Brand Deals" },
     { href: "/dashboard/earnings", icon: DollarSign, label: "Earnings" },
@@ -45,6 +46,7 @@ const DashboardLayout = ({ children, userType = "influencer" }: DashboardLayoutP
     { href: "/admin/applications", icon: FileText, label: "Applications" },
     { href: "/admin/finances", icon: DollarSign, label: "Finances" },
     { href: "/admin/content", icon: BarChart, label: "Content" },
+    { href: "/admin/categories", icon: Tag, label: "Categories" },
     { href: "/admin/settings", icon: Settings, label: "Settings" },
   ];
 
@@ -56,8 +58,15 @@ const DashboardLayout = ({ children, userType = "influencer" }: DashboardLayoutP
     : "??";
 
   const handleSignOut = async () => {
-    await signOut();
-    navigate("/");
+    try {
+      await signOut();
+      // Small delay to ensure auth state fully clears before navigation
+      setTimeout(() => navigate("/", { replace: true }), 100);
+    } catch (error) {
+      console.error("Sign out error:", error);
+      // Force navigate even on error
+      navigate("/", { replace: true });
+    }
   };
 
   return (

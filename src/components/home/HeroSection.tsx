@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Play } from "lucide-react";
 import { motion } from "framer-motion";
-import heroImage from "@/assets/hero-creators.jpg";
+import heroImage from "@/assets/hero-creators.png";
 
 const HeroSection = () => {
   return (
@@ -26,13 +26,13 @@ const HeroSection = () => {
               <span className="w-2 h-2 rounded-full bg-coral animate-pulse" />
               Now accepting new creators
             </div>
-            
+
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-heading font-bold leading-tight mb-6">
               We Connect{" "}
               <span className="text-coral">Micro-Influencers</span> with Perfect
               Brand Partnerships
             </h1>
-            
+
             <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-xl mx-auto lg:mx-0">
               Specializing in creators with 1K–10K highly engaged followers. Turn your authentic influence into sustainable income.
             </p>
@@ -84,7 +84,7 @@ const HeroSection = () => {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-navy/20 to-transparent" />
             </div>
-            
+
             {/* Floating Card */}
             <motion.div
               initial={{ opacity: 0, x: 20 }}

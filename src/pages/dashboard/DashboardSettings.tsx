@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { motion } from "framer-motion";
-import { User, Bell, Shield, CreditCard, Globe, Loader2, CheckCircle, Eye, EyeOff } from "lucide-react";
+import { User, Bell, Shield, CreditCard, Globe, Loader2, CheckCircle, Eye, EyeOff, Tag } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -12,16 +12,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui/use-toast";
-import { profileService, influencerService } from "@/services/api";
+import { profileService, influencerService, categoryService } from "@/services/api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import CategorySelector from "@/components/categories/CategorySelector";
 
 interface DashboardSettingsProps {
   userType?: "influencer" | "brand";
 }
 
-const DashboardSettings = ({ userType = "influencer" }: DashboardSettingsProps) => {
+const DashboardSettings = ({ userType: userTypeProp = "influencer" }: DashboardSettingsProps) => {
   const { user, profile, refreshProfile } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
+
+  // Auto-detect the actual user type from profile role
+  const userType = (profile?.role === "brand" ? "brand" : profile?.role === "influencer" ? "influencer" : userTypeProp) as "influencer" | "brand";
 
   // Password Visibility State
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
@@ -196,6 +202,9 @@ const DashboardSettings = ({ userType = "influencer" }: DashboardSettingsProps) 
             <TabsTrigger value="notifications"><Bell className="w-4 h-4 mr-2" />Notifications</TabsTrigger>
             <TabsTrigger value="security"><Shield className="w-4 h-4 mr-2" />Security</TabsTrigger>
             {userType === "influencer" && (
+              <TabsTrigger value="categories"><Tag className="w-4 h-4 mr-2" />Categories</TabsTrigger>
+            )}
+            {userType === "influencer" && (
               <TabsTrigger value="payout"><CreditCard className="w-4 h-4 mr-2" />Payout</TabsTrigger>
             )}
           </TabsList>
@@ -270,25 +279,7 @@ const DashboardSettings = ({ userType = "influencer" }: DashboardSettingsProps) 
               </Card>
             </motion.div>
 
-            {userType === "influencer" && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Connected Accounts</CardTitle>
-                  <CardDescription>Manage your social profiles.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {["Instagram", "TikTok", "YouTube", "Twitter"].map((platform) => (
-                    <div key={platform} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                      <div className="flex items-center gap-3">
-                        <Globe className="w-5 h-5 text-muted-foreground" />
-                        <span className="font-medium">{platform}</span>
-                      </div>
-                      <Button variant="outline" size="sm">Connect</Button>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
+            <SocialAccountsCard userType={userType} userId={user?.id} />
           </TabsContent>
 
           <TabsContent value="notifications" className="mt-6">
@@ -385,6 +376,10 @@ const DashboardSettings = ({ userType = "influencer" }: DashboardSettingsProps) 
           </TabsContent>
 
           {userType === "influencer" && (
+            <CategoriesTabContent userId={user?.id} toast={toast} queryClient={queryClient} />
+          )}
+
+          {userType === "influencer" && (
             <TabsContent value="payout" className="mt-6">
               <Card>
                 <CardHeader>
@@ -460,6 +455,293 @@ const DashboardSettings = ({ userType = "influencer" }: DashboardSettingsProps) 
         </Tabs>
       </div>
     </DashboardLayout>
+  );
+};
+
+// ── Social Accounts Card ──
+interface SocialAccountsCardProps {
+  userType: "influencer" | "brand";
+  userId?: string;
+}
+
+const PLATFORMS = [
+  { key: "instagram", label: "Instagram", handleField: "instagram_handle", placeholder: "@your_instagram" },
+  { key: "tiktok", label: "TikTok", handleField: "tiktok_handle", placeholder: "@your_tiktok" },
+  { key: "youtube", label: "YouTube", handleField: "youtube_handle", placeholder: "@your_youtube" },
+  { key: "twitter", label: "Twitter / X", handleField: "twitter_handle", placeholder: "@your_twitter" },
+] as const;
+
+const SocialAccountsCard = ({ userType, userId }: SocialAccountsCardProps) => {
+  const { toast } = useToast();
+  const [socialHandles, setSocialHandles] = useState<Record<string, string>>({
+    instagram_handle: "",
+    tiktok_handle: "",
+    youtube_handle: "",
+    twitter_handle: "",
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingSocials, setIsLoadingSocials] = useState(true);
+
+  // Load existing social handles
+  useEffect(() => {
+    const loadSocials = async () => {
+      if (!userId) return;
+      setIsLoadingSocials(true);
+      try {
+        if (userType === "influencer") {
+          const { data } = await supabase
+            .from("influencer_profiles")
+            .select("instagram_handle, tiktok_handle, youtube_handle, twitter_handle")
+            .eq("profile_id", userId)
+            .single();
+
+          if (data) {
+            setSocialHandles({
+              instagram_handle: data.instagram_handle || "",
+              tiktok_handle: data.tiktok_handle || "",
+              youtube_handle: data.youtube_handle || "",
+              twitter_handle: data.twitter_handle || "",
+            });
+          }
+        } else {
+          // For brands, store social handles in brand_profiles
+          const { data } = await supabase
+            .from("brand_profiles")
+            .select("company_website")
+            .eq("profile_id", userId)
+            .single();
+
+          // Brands can also store socials via user metadata
+          const { data: { user } } = await supabase.auth.getUser();
+          const socials = user?.user_metadata?.social_handles || {};
+          setSocialHandles({
+            instagram_handle: socials.instagram_handle || "",
+            tiktok_handle: socials.tiktok_handle || "",
+            youtube_handle: socials.youtube_handle || "",
+            twitter_handle: socials.twitter_handle || "",
+          });
+        }
+      } catch (err) {
+        console.error("Error loading socials:", err);
+      } finally {
+        setIsLoadingSocials(false);
+      }
+    };
+
+    loadSocials();
+  }, [userId, userType]);
+
+  const handleSaveSocials = async () => {
+    if (!userId) return;
+    setIsSaving(true);
+    try {
+      if (userType === "influencer") {
+        const { error } = await supabase
+          .from("influencer_profiles")
+          .update({
+            instagram_handle: socialHandles.instagram_handle || null,
+            tiktok_handle: socialHandles.tiktok_handle || null,
+            youtube_handle: socialHandles.youtube_handle || null,
+            twitter_handle: socialHandles.twitter_handle || null,
+          })
+          .eq("profile_id", userId);
+
+        if (error) throw error;
+      } else {
+        // Save brand socials to user metadata
+        const { error } = await supabase.auth.updateUser({
+          data: { social_handles: socialHandles },
+        });
+        if (error) throw error;
+      }
+
+      toast({
+        title: "Social Profiles Updated",
+        description: "Your social accounts have been connected successfully.",
+      });
+    } catch (error: unknown) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to save social profiles.",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const getPlatformIcon = (key: string) => {
+    const colors: Record<string, string> = {
+      instagram: "text-pink-500",
+      tiktok: "text-foreground",
+      youtube: "text-red-500",
+      twitter: "text-sky-500",
+    };
+    return <Globe className={`w-5 h-5 ${colors[key] || "text-muted-foreground"}`} />;
+  };
+
+  const connectedCount = Object.values(socialHandles).filter(Boolean).length;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Globe className="w-5 h-5 text-coral" />
+          Connected Accounts
+        </CardTitle>
+        <CardDescription>
+          Connect your social media profiles.
+          {connectedCount > 0 && (
+            <span className="ml-2 text-xs font-medium text-coral">
+              {connectedCount}/{PLATFORMS.length} connected
+            </span>
+          )}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isLoadingSocials ? (
+          <div className="flex items-center justify-center py-6">
+            <Loader2 className="w-5 h-5 animate-spin text-coral" />
+          </div>
+        ) : (
+          <>
+            {PLATFORMS.map((platform) => (
+              <div
+                key={platform.key}
+                className="flex items-center gap-3 p-3 rounded-lg bg-muted/50"
+              >
+                <div className="flex items-center gap-3 min-w-[120px]">
+                  {getPlatformIcon(platform.key)}
+                  <span className="font-medium text-sm">{platform.label}</span>
+                </div>
+                <Input
+                  className="flex-1"
+                  placeholder={platform.placeholder}
+                  value={socialHandles[platform.handleField]}
+                  onChange={(e) =>
+                    setSocialHandles({
+                      ...socialHandles,
+                      [platform.handleField]: e.target.value,
+                    })
+                  }
+                />
+                {socialHandles[platform.handleField] && (
+                  <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
+                )}
+              </div>
+            ))}
+            <Button
+              variant="coral"
+              onClick={handleSaveSocials}
+              disabled={isSaving}
+              className="mt-2"
+            >
+              {isSaving ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : null}
+              Save Social Profiles
+            </Button>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+// ── Extracted Categories Tab Content ──
+interface CategoriesTabProps {
+  userId?: string;
+  toast: ReturnType<typeof useToast>["toast"];
+  queryClient: any;
+}
+
+const CategoriesTabContent = ({ userId, toast, queryClient }: CategoriesTabProps) => {
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [hasLoaded, setHasLoaded] = useState(false);
+
+  // Fetch influencer's current categories
+  const { data: currentCategories = [], isLoading: isFetching } = useQuery({
+    queryKey: ["influencer-categories", userId],
+    queryFn: () => categoryService.getInfluencerCategories(userId!),
+    enabled: !!userId,
+  });
+
+  // Sync fetched categories into local state (once)
+  useEffect(() => {
+    if (currentCategories.length > 0 && !hasLoaded) {
+      setSelectedCategoryIds(currentCategories.map((c) => c.category_id));
+      setHasLoaded(true);
+    } else if (currentCategories.length === 0 && !hasLoaded && !isFetching) {
+      setHasLoaded(true);
+    }
+  }, [currentCategories, hasLoaded, isFetching]);
+
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      categoryService.setInfluencerCategories(userId!, selectedCategoryIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["influencer-categories", userId] });
+      queryClient.invalidateQueries({ queryKey: ["matching-campaigns", userId] });
+      toast({
+        title: "Categories Saved",
+        description: "Your niche categories have been updated. Campaign matching will now reflect your choices.",
+      });
+    },
+    onError: (err: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err.message || "Failed to save categories.",
+      });
+    },
+  });
+
+  return (
+    <TabsContent value="categories" className="mt-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Tag className="w-5 h-5 text-coral" />
+            Your Niche Categories
+          </CardTitle>
+          <CardDescription>
+            Select the categories that best describe your content. Brands will
+            find you based on these categories when creating campaigns.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {isFetching ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-coral" />
+            </div>
+          ) : (
+            <>
+              <CategorySelector
+                selectedIds={selectedCategoryIds}
+                onChange={setSelectedCategoryIds}
+                maxSelection={8}
+                label="Select Your Niches"
+                description="Choose up to 8 categories that match your content"
+              />
+              <Button
+                variant="coral"
+                onClick={() => saveMutation.mutate()}
+                disabled={saveMutation.isPending}
+              >
+                {saveMutation.isPending && (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                )}
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Save Categories
+              </Button>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </TabsContent>
   );
 };
 

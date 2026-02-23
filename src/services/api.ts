@@ -30,10 +30,20 @@ import type {
     PricingPackage,
     Lead,
     LeadInsert,
+    Category,
+    CategoryInsert,
+    CategoryUpdate,
+    CampaignCategory,
+    InfluencerCategory,
+    MatchingCampaign,
+    CategoryStats,
     InfluencerDashboardStats,
     BrandDashboardStats,
     AdminDashboardStats,
     UserRole,
+    SuccessStory,
+    SuccessStoryInsert,
+    SuccessStoryUpdate,
 } from '@/types/database.types';
 
 // ────────────────────────────────────────────────────────
@@ -334,19 +344,20 @@ export const campaignService = {
     },
 
     async getAdminCampaigns() {
+        // campaigns.brand_id references profiles(id), not brand_profiles
         const { data, error } = await supabase
             .from('campaigns')
             .select(`
                 *,
-                brand_profile:brand_profiles!brand_id (
-                    company_name
+                brand_profile:profiles!brand_id (
+                    full_name
                 ),
                 applications:campaign_applications(count)
             `)
             .order('created_at', { ascending: false });
 
         if (error) {
-            // Fallback if the relationship is not named 'brand_profile' or foreign key is different
+            // Fallback if the join fails
             console.warn("Failed to fetch admin campaigns with joins, trying simple fetch", error);
             const { data: simpleData, error: simpleError } = await supabase
                 .from('campaigns')
@@ -356,7 +367,13 @@ export const campaignService = {
             if (simpleError) throw simpleError;
             return simpleData;
         }
-        return data || [];
+        // Remap brand_profile.full_name → brand_profile.company_name for compatibility
+        return (data || []).map((c: any) => ({
+            ...c,
+            brand_profile: c.brand_profile
+                ? { company_name: c.brand_profile.full_name || 'Unknown' }
+                : null,
+        }));
     },
 };
 
@@ -585,17 +602,35 @@ export const paymentService = {
     },
 
     async getAdminPayments() {
+        // Try joining through profiles (brand_id references profiles, not brand_profiles)
         const { data, error } = await supabase
             .from('payments')
             .select(`
                 *,
-                brand:brand_profiles!brand_id(company_name),
+                brand:profiles!brand_id(full_name),
                 campaign:campaigns!campaign_id(title)
             `)
             .order('created_at', { ascending: false });
 
-        if (error) throw error;
-        return data || [];
+        if (error) {
+            console.warn('Failed to fetch admin payments with joins, trying simple fetch', error);
+            const { data: simpleData, error: simpleError } = await supabase
+                .from('payments')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (simpleError) throw simpleError;
+            return (simpleData || []).map((p: any) => ({
+                ...p,
+                brand: { company_name: 'Unknown' },
+                campaign: { title: 'Unknown' },
+            }));
+        }
+        // Remap brand.full_name to brand.company_name for compatibility
+        return (data || []).map((p: any) => ({
+            ...p,
+            brand: { company_name: p.brand?.full_name || 'Unknown' },
+        }));
     },
 
     async getAdminPayouts() {
@@ -999,14 +1034,25 @@ export const leadService = {
 
 export const settingsService = {
     async getSetting(key: string): Promise<string | null> {
-        const { data, error } = await supabase
-            .from('platform_settings')
-            .select('value')
-            .eq('key', key)
-            .single();
+        try {
+            const { data, error } = await supabase
+                .from('platform_settings')
+                .select('value')
+                .eq('key', key)
+                .single();
 
-        if (error) return null;
-        return data?.value ?? null;
+            // 406 = RLS blocked, 404 = table doesn't exist, PGRST116 = no rows
+            if (error) {
+                if (error.code === 'PGRST116' || error.message?.includes('406') || error.message?.includes('404')) {
+                    return null;
+                }
+                // Silently handle — settings may not exist yet
+                return null;
+            }
+            return data?.value ?? null;
+        } catch {
+            return null;
+        }
     },
 
     async updateSetting(key: string, value: string, updatedBy: string): Promise<void> {
@@ -1206,5 +1252,258 @@ export const adminService = {
             p_new_role: newRole,
         });
         if (error) throw error;
+    },
+};
+
+// ────────────────────────────────────────────────────────
+// SUCCESS STORIES
+// ────────────────────────────────────────────────────────
+
+export const successStoryService = {
+    async getSuccessStories(publishedOnly = true): Promise<SuccessStory[]> {
+        try {
+            let query = supabase
+                .from('success_stories')
+                .select('*')
+                .order('display_order', { ascending: true });
+
+            if (publishedOnly) query = query.eq('is_published', true);
+
+            const { data, error } = await query;
+            if (error) {
+                // Table may not exist yet (404) — return empty
+                if (error.code === '42P01' || error.message?.includes('404') || (error as any).status === 404) {
+                    console.warn('success_stories table not found — run migration 006');
+                    return [];
+                }
+                throw error;
+            }
+            return data || [];
+        } catch (err: any) {
+            console.warn('Error fetching success stories:', err?.message);
+            return [];
+        }
+    },
+
+    async createSuccessStory(story: SuccessStoryInsert): Promise<SuccessStory> {
+        const { data, error } = await supabase
+            .from('success_stories')
+            .insert(story)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    async updateSuccessStory(id: string, updates: SuccessStoryUpdate): Promise<SuccessStory> {
+        const { data, error } = await supabase
+            .from('success_stories')
+            .update(updates)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    async deleteSuccessStory(id: string): Promise<void> {
+        const { error } = await supabase
+            .from('success_stories')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+    },
+};
+
+// ────────────────────────────────────────────────────────
+// CATEGORIES & MATCHING
+// ────────────────────────────────────────────────────────
+
+export const categoryService = {
+    // ── Read operations ───────────────────────────────────
+
+    async getCategories(activeOnly = true): Promise<Category[]> {
+        try {
+            let query = supabase
+                .from('categories')
+                .select('*')
+                .order('display_order', { ascending: true });
+
+            if (activeOnly) {
+                query = query.eq('is_active', true);
+            }
+
+            const { data, error } = await query;
+            if (error) {
+                // Table may not exist yet (404) — return empty
+                if (error.code === '42P01' || error.message?.includes('404') || (error as any).status === 404) {
+                    console.warn('categories table not found — run migration 005');
+                    return [];
+                }
+                throw error;
+            }
+            return data || [];
+        } catch (err: any) {
+            console.warn('Error fetching categories:', err?.message);
+            return [];
+        }
+    },
+
+    async getCategory(id: string): Promise<Category | null> {
+        const { data, error } = await supabase
+            .from('categories')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    // ── Admin: Create / Update / Delete categories ────────
+
+    async createCategory(category: CategoryInsert): Promise<Category> {
+        const { data, error } = await supabase
+            .from('categories')
+            .insert(category)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    async updateCategory(id: string, updates: CategoryUpdate): Promise<Category> {
+        const { data, error } = await supabase
+            .from('categories')
+            .update(updates)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    async deleteCategory(id: string): Promise<void> {
+        const { error } = await supabase
+            .from('categories')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+    },
+
+    // ── Campaign categories ──────────────────────────────
+
+    async getCampaignCategories(campaignId: string): Promise<(CampaignCategory & { category: Category })[]> {
+        const { data, error } = await supabase
+            .from('campaign_categories')
+            .select('*, category:categories(*)')
+            .eq('campaign_id', campaignId);
+
+        if (error) throw error;
+        return data || [];
+    },
+
+    async setCampaignCategories(campaignId: string, categoryIds: string[]): Promise<void> {
+        // Delete existing associations
+        const { error: deleteError } = await supabase
+            .from('campaign_categories')
+            .delete()
+            .eq('campaign_id', campaignId);
+
+        if (deleteError) throw deleteError;
+
+        // Insert new associations
+        if (categoryIds.length > 0) {
+            const rows = categoryIds.map(category_id => ({
+                campaign_id: campaignId,
+                category_id,
+            }));
+
+            const { error: insertError } = await supabase
+                .from('campaign_categories')
+                .insert(rows);
+
+            if (insertError) throw insertError;
+        }
+    },
+
+    // ── Influencer categories ────────────────────────────
+
+    async getInfluencerCategories(influencerId: string): Promise<(InfluencerCategory & { category: Category })[]> {
+        const { data, error } = await supabase
+            .from('influencer_categories')
+            .select('*, category:categories(*)')
+            .eq('influencer_id', influencerId);
+
+        if (error) throw error;
+        return data || [];
+    },
+
+    async setInfluencerCategories(influencerId: string, categoryIds: string[]): Promise<void> {
+        // Delete existing associations
+        const { error: deleteError } = await supabase
+            .from('influencer_categories')
+            .delete()
+            .eq('influencer_id', influencerId);
+
+        if (deleteError) throw deleteError;
+
+        // Insert new associations
+        if (categoryIds.length > 0) {
+            const rows = categoryIds.map(category_id => ({
+                influencer_id: influencerId,
+                category_id,
+            }));
+
+            const { error: insertError } = await supabase
+                .from('influencer_categories')
+                .insert(rows);
+
+            if (insertError) throw insertError;
+        }
+    },
+
+    // ── Matching: Get campaigns matching influencer categories ──
+
+    async getMatchingCampaigns(
+        influencerId: string,
+        page = 1,
+        pageSize = 20
+    ): Promise<MatchingCampaign[]> {
+        const { data, error } = await supabase.rpc('get_matching_campaigns', {
+            p_influencer_id: influencerId,
+            p_page: page,
+            p_page_size: pageSize,
+        });
+
+        if (error) throw error;
+        return (data as MatchingCampaign[]) || [];
+    },
+
+    // ── Stats: Category usage stats (admin) ──────────────
+
+    async getCategoryStats(): Promise<CategoryStats[]> {
+        try {
+            const { data, error } = await supabase.rpc('get_category_stats');
+
+            if (error) {
+                // RPC function may not exist yet (404)
+                if (error.code === '42883' || error.message?.includes('404') || (error as any).status === 404) {
+                    console.warn('get_category_stats RPC not found — run migration 005');
+                    return [];
+                }
+                throw error;
+            }
+            return (data as CategoryStats[]) || [];
+        } catch (err: any) {
+            console.warn('Error fetching category stats:', err?.message);
+            return [];
+        }
     },
 };
