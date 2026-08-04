@@ -2,6 +2,7 @@ import Layout from "@/components/layout/Layout";
 import { motion } from "framer-motion";
 import { Heart, Target, Users, Award } from "lucide-react";
 import founderImage from "@/assets/founder.jpg";
+import { usePlatformStats, useCountUp, formatStatValue } from "@/hooks/usePlatformStats";
 
 const values = [
   {
@@ -33,27 +34,15 @@ const team = [
     image: founderImage,
     bio: "Former micro-influencer turned entrepreneur. Passionate about helping small creators thrive.",
   },
-  {
-    name: "Jordan Williams",
-    role: "Head of Creator Relations",
-    image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop",
-    bio: "10+ years in talent management. Believes every creator deserves a fair shot.",
-  },
-  {
-    name: "Sarah Mitchell",
-    role: "Director of Brand Partnerships",
-    image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop",
-    bio: "Former brand marketing lead at Fortune 500 companies. Expert in influencer ROI.",
-  },
-  {
-    name: "Alex Rivera",
-    role: "Head of Operations",
-    image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop",
-    bio: "Operations wizard who keeps everything running smoothly behind the scenes.",
-  },
 ];
 
 const About = () => {
+  const { activeCreators, brandPartners, creatorEarnings, satisfaction } = usePlatformStats();
+  const animatedCreators = useCountUp(activeCreators);
+  const animatedBrands = useCountUp(brandPartners);
+  const animatedEarnings = useCountUp(creatorEarnings);
+  const animatedSatisfaction = useCountUp(satisfaction);
+
   return (
     <Layout>
       {/* Hero */}
@@ -185,7 +174,7 @@ const About = () => {
             </p>
           </motion.div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="flex justify-center">
             {team.map((member, index) => (
               <motion.div
                 key={member.name}
@@ -193,7 +182,7 @@ const About = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
-                className="text-center"
+                className="text-center max-w-sm"
               >
                 <img
                   src={member.image}
@@ -214,10 +203,10 @@ const About = () => {
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 text-center">
             {[
-              { value: "500+", label: "Active Creators" },
-              { value: "150+", label: "Brand Partners" },
-              { value: "$2M+", label: "Creator Earnings" },
-              { value: "95%", label: "Creator Satisfaction" },
+              { value: animatedCreators, label: "Active Creators" },
+              { value: animatedBrands, label: "Brand Partners" },
+              { value: animatedEarnings, label: "Creator Earnings" },
+              { value: animatedSatisfaction, label: "Creator Satisfaction" },
             ].map((stat, index) => (
               <motion.div
                 key={stat.label}
@@ -226,7 +215,9 @@ const About = () => {
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
               >
-                <p className="text-4xl lg:text-5xl font-heading font-bold mb-2">{stat.value}</p>
+                <p className="text-4xl lg:text-5xl font-heading font-bold mb-2">
+                  {formatStatValue(stat.label, stat.value)}
+                </p>
                 <p className="text-primary-foreground/70">{stat.label}</p>
               </motion.div>
             ))}

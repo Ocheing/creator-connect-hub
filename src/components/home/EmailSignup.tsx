@@ -4,11 +4,13 @@ import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
 import { Download, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { usePlatformStats } from "@/hooks/usePlatformStats";
 
 const EmailSignup = () => {
   const [email, setEmail] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
   const { toast } = useToast();
+  const { activeCreators } = usePlatformStats();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,7 +67,7 @@ const EmailSignup = () => {
               </form>
 
               <p className="text-sm text-primary-foreground/50 mt-4">
-                Join 2,500+ creators. No spam, ever.
+                Join {activeCreators.toLocaleString()}+ creators. No spam, ever.
               </p>
             </>
           ) : (

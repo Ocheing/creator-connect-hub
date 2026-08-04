@@ -23,6 +23,7 @@ const ForInfluencers = lazy(() => import("./pages/ForInfluencers"));
 const ForBrands = lazy(() => import("./pages/ForBrands"));
 const About = lazy(() => import("./pages/About"));
 const Blog = lazy(() => import("./pages/Blog"));
+const BlogPost = lazy(() => import("./pages/BlogPost"));
 const SignIn = lazy(() => import("./pages/SignIn"));
 const SignUp = lazy(() => import("./pages/SignUp"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
@@ -87,6 +88,7 @@ const App = () => (
             <Route path="/for-brands" element={<Suspense fallback={<LoadingSpinner />}><ForBrands /></Suspense>} />
             <Route path="/about" element={<Suspense fallback={<LoadingSpinner />}><About /></Suspense>} />
             <Route path="/blog" element={<Suspense fallback={<LoadingSpinner />}><Blog /></Suspense>} />
+            <Route path="/blog/:slug" element={<Suspense fallback={<LoadingSpinner />}><BlogPost /></Suspense>} />
             <Route path="/reset-password" element={<Suspense fallback={<LoadingSpinner />}><ResetPassword /></Suspense>} />
 
             {/* ── Auth Routes (redirect if already logged in) ── */}

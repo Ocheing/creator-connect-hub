@@ -4,7 +4,15 @@ import { ArrowRight, Play } from "lucide-react";
 import { motion } from "framer-motion";
 import heroImage from "@/assets/hero-creators.png";
 
+import { usePlatformStats, useCountUp, formatStatValue } from "@/hooks/usePlatformStats";
+
 const HeroSection = () => {
+  const { activeCreators, brandPartners, creatorEarnings } = usePlatformStats();
+  
+  const animatedCreators = useCountUp(activeCreators);
+  const animatedBrands = useCountUp(brandPartners);
+  const animatedEarnings = useCountUp(creatorEarnings);
+
   return (
     <section className="relative overflow-hidden bg-gradient-hero">
       {/* Background decoration */}
@@ -55,15 +63,21 @@ const HeroSection = () => {
             {/* Stats */}
             <div className="flex flex-wrap justify-center lg:justify-start gap-8 mt-12 pt-8 border-t border-border">
               <div>
-                <p className="text-3xl font-heading font-bold text-foreground">500+</p>
+                <p className="text-3xl font-heading font-bold text-foreground">
+                  {formatStatValue("Active Creators", animatedCreators)}
+                </p>
                 <p className="text-sm text-muted-foreground">Active Creators</p>
               </div>
               <div>
-                <p className="text-3xl font-heading font-bold text-foreground">150+</p>
+                <p className="text-3xl font-heading font-bold text-foreground">
+                  {formatStatValue("Brand Partners", animatedBrands)}
+                </p>
                 <p className="text-sm text-muted-foreground">Brand Partners</p>
               </div>
               <div>
-                <p className="text-3xl font-heading font-bold text-foreground">$2M+</p>
+                <p className="text-3xl font-heading font-bold text-foreground">
+                  {formatStatValue("Creator Earnings", animatedEarnings)}
+                </p>
                 <p className="text-sm text-muted-foreground">Creator Earnings</p>
               </div>
             </div>

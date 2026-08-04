@@ -8,8 +8,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { motion } from "framer-motion";
 import { DollarSign, Clock, Shield, Users, ChevronDown, ChevronUp, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { usePlatformStats } from "@/hooks/usePlatformStats";
 
-const benefits = [
+const getStaticBenefits = (brandCount: number) => [
   {
     icon: DollarSign,
     title: "Higher Pay Rates",
@@ -28,7 +29,7 @@ const benefits = [
   {
     icon: Users,
     title: "More Brand Deals",
-    description: "Access our network of 150+ brands actively seeking micro-influencers.",
+    description: `Access our network of ${brandCount}+ brands actively seeking micro-influencers.`,
   },
 ];
 
@@ -59,6 +60,8 @@ const ForInfluencers = () => {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const { toast } = useToast();
+  const { brandPartners } = usePlatformStats();
+  const benefits = getStaticBenefits(brandPartners);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

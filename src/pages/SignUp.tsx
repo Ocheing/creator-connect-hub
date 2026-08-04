@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import { Sparkles, Eye, EyeOff, ArrowRight, Users, Building2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePlatformStats } from "@/hooks/usePlatformStats";
 import type { UserRole } from "@/types/database.types";
 
 const SignUp = () => {
@@ -23,6 +24,7 @@ const SignUp = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { signUp } = useAuth();
+  const { activeCreators, brandPartners } = usePlatformStats();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -246,7 +248,7 @@ const SignUp = () => {
             <Sparkles className="w-10 h-10" />
           </div>
           <h2 className="text-3xl font-heading font-bold mb-4">
-            Join 500+ Creators & 150+ Brands
+            Join {activeCreators}+ Creators & {brandPartners}+ Brands
           </h2>
           <p className="text-primary-foreground/70">
             Start building meaningful partnerships today. Whether you're a creator looking for brand deals or a brand seeking authentic voices, we've got you covered.

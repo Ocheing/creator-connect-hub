@@ -57,6 +57,7 @@ const ForBrands = () => {
   } = useQuery({
     queryKey: ["success-stories"],
     queryFn: () => successStoryService.getSuccessStories(true),
+    staleTime: 5 * 60 * 1000, // Cache results for 5 minutes
   });
 
   // Fetch categories for the industry dropdown
@@ -66,20 +67,25 @@ const ForBrands = () => {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Real-time subscription for success stories
+  // Real-time subscription for success stories with debounce
   useEffect(() => {
+    let timeoutId: number;
     const channel = supabase
       .channel("success-stories-realtime")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "success_stories" },
         () => {
-          refetchStories();
+          window.clearTimeout(timeoutId);
+          timeoutId = window.setTimeout(() => {
+            refetchStories();
+          }, 500);
         }
       )
       .subscribe();
 
     return () => {
+      window.clearTimeout(timeoutId);
       supabase.removeChannel(channel);
     };
   }, [refetchStories]);
@@ -159,8 +165,23 @@ const ForBrands = () => {
           </motion.div>
 
           {storiesLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-coral" />
+            <div className="grid lg:grid-cols-3 gap-8">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-card rounded-2xl overflow-hidden border border-border animate-pulse shadow-sm">
+                  <div className="h-40 bg-muted/40" />
+                  <div className="p-6 space-y-4">
+                    <div className="h-6 w-20 bg-muted/40 rounded-full" />
+                    <div className="h-6 w-3/4 bg-muted/40 rounded" />
+                    <div className="h-5 w-1/2 bg-muted/40 rounded" />
+                    <div className="h-4 w-full bg-muted/40 rounded" />
+                    <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border">
+                      <div className="h-10 bg-muted/40 rounded" />
+                      <div className="h-10 bg-muted/40 rounded" />
+                      <div className="h-10 bg-muted/40 rounded" />
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : successStories.length > 0 ? (
             <div className="grid lg:grid-cols-3 gap-8">
