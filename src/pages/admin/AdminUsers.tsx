@@ -27,6 +27,7 @@ const statusColors: Record<string, string> = {
 
 const AdminUsers = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [loadingAction, setLoadingAction] = useState<string | null>(null);
 
   const { data: rawUsers, isLoading, refetch } = useQuery({
     queryKey: ['adminUsers'],
@@ -52,22 +53,28 @@ const AdminUsers = () => {
   }, [refetch]);
 
   const handleVerify = async (userId: string) => {
+    setLoadingAction(`${userId}_verify`);
     try {
       await adminService.verifyUser(userId);
       toast.success("User verified successfully");
     } catch (error) {
       console.error(error);
       toast.error("Failed to verify user");
+    } finally {
+      setLoadingAction(null);
     }
   };
 
   const handleToggleActive = async (userId: string, isActive: boolean) => {
+    setLoadingAction(`${userId}_${isActive ? 'reactivate' : 'suspend'}`);
     try {
       await adminService.toggleUserActive(userId, isActive);
       toast.success(isActive ? "User reactivated" : "User suspended");
     } catch (error) {
       console.error(error);
       toast.error("Failed to update user status");
+    } finally {
+      setLoadingAction(null);
     }
   };
 
@@ -187,13 +194,22 @@ const AdminUsers = () => {
                               <td className="py-3 px-4">
                                 <div className="flex gap-1">
                                   {user.status === "pending" && (
-                                    <Button size="sm" variant="coral" className="text-xs h-7" onClick={() => handleVerify(user.id)}>Approve</Button>
+                                    <Button size="sm" variant="coral" className="text-xs h-7" onClick={() => handleVerify(user.id)} disabled={!!loadingAction}>
+                                      {loadingAction === `${user.id}_verify` && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                                      Approve
+                                    </Button>
                                   )}
-                                  {user.status === "active" && (
-                                    <Button size="sm" variant="ghost" className="text-xs h-7 text-red-600" onClick={() => handleToggleActive(user.id, false)}>Suspend</Button>
+                                  {user.status === 'active' && (
+                                    <Button size="sm" variant="ghost" className="text-xs h-7 text-red-600" onClick={() => handleToggleActive(user.id, false)} disabled={!!loadingAction}>
+                                      {loadingAction === `${user.id}_suspend` && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                                      Suspend
+                                    </Button>
                                   )}
-                                  {user.status === "suspended" && (
-                                    <Button size="sm" variant="ghost" className="text-xs h-7 text-green-600" onClick={() => handleToggleActive(user.id, true)}>Reactivate</Button>
+                                  {user.status === 'suspended' && (
+                                    <Button size="sm" variant="ghost" className="text-xs h-7 text-green-600" onClick={() => handleToggleActive(user.id, true)} disabled={!!loadingAction}>
+                                      {loadingAction === `${user.id}_reactivate` && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                                      Reactivate
+                                    </Button>
                                   )}
                                   <Button size="sm" variant="ghost" className="text-xs h-7"><MoreVertical className="w-3 h-3" /></Button>
                                 </div>

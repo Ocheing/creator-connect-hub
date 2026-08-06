@@ -7,6 +7,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -19,6 +20,7 @@ const DashboardLayout = ({ children, userType = "influencer" }: DashboardLayoutP
   const { profile, signOut, isAdmin } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   const influencerNav = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Overview" },
@@ -60,6 +62,7 @@ const DashboardLayout = ({ children, userType = "influencer" }: DashboardLayoutP
   const handleSignOut = async () => {
     try {
       await signOut();
+      queryClient.clear();
       // Small delay to ensure auth state fully clears before navigation
       setTimeout(() => navigate("/", { replace: true }), 100);
     } catch (error) {

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -21,7 +21,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/contexts/AuthContext";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
 import { categoryService } from "@/services/api";
 import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
@@ -33,12 +34,40 @@ const InfluencerDiscover = () => {
     const [search, setSearch] = useState("");
     const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string | null>(null);
 
+    const queryClient = useQueryClient();
+
     // Fetch matching campaigns via RPC
     const { data: campaigns = [], isLoading } = useQuery({
         queryKey: ["matching-campaigns", user?.id],
         queryFn: () => categoryService.getMatchingCampaigns(user!.id, 1, 50),
         enabled: !!user,
     });
+
+    // Real-time subscription for newly published campaigns
+    useEffect(() => {
+        if (!user) return;
+
+        const channel = supabase
+            .channel('discover-campaigns-changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'campaigns',
+                    filter: `status=eq.active`,
+                },
+                () => {
+                    // Refetch campaigns when a new one is published or updated
+                    queryClient.invalidateQueries({ queryKey: ["matching-campaigns", user.id] });
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [user, queryClient]);
 
     // Fetch user categories for filter chips
     const { data: userCategories = [] } = useQuery({

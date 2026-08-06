@@ -356,6 +356,21 @@ export interface MatchingCampaign {
     created_at: string;
 }
 
+export interface MatchingInfluencer {
+    influencer_id: string;
+    full_name: string;
+    avatar_url: string | null;
+    instagram_handle: string | null;
+    tiktok_handle: string | null;
+    youtube_handle: string | null;
+    twitter_handle: string | null;
+    total_followers: number;
+    engagement_rate: number;
+    match_score: number;
+    matching_categories: string[];
+    total_influencer_categories: number;
+}
+
 export interface CategoryStats {
     category_id: string;
     category_name: string;

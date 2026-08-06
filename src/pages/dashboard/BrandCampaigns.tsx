@@ -52,22 +52,8 @@ const BrandCampaigns = () => {
     queryKey: ['campaign-categories-map', campaignIds.join(',')],
     queryFn: async () => {
       if (campaignIds.length === 0) return {};
-      const results: Record<string, Category[]> = {};
-      // Fetch all in parallel — wrap each in try/catch so one failure doesn't crash all
-      const chunks = await Promise.all(
-        campaignIds.map(async (id) => {
-          try {
-            const cats = await categoryService.getCampaignCategories(id);
-            return { id, categories: cats.map(cc => cc.category).filter(Boolean) };
-          } catch {
-            return { id, categories: [] as Category[] };
-          }
-        })
-      );
-      chunks.forEach(({ id, categories }) => {
-        results[id] = categories;
-      });
-      return results;
+      // Fetch all campaign categories in a single batched API call to prevent N+1 query waterfall
+      return await categoryService.getCampaignCategoriesBatch(campaignIds);
     },
     enabled: campaignIds.length > 0,
     staleTime: 2 * 60 * 1000,

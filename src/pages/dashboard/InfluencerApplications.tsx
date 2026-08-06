@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { motion } from "framer-motion";
@@ -31,6 +31,7 @@ const statusConfig: Record<string, { icon: typeof Clock; color: string; bg: stri
 const InfluencerApplications = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
 
   // Fetch applications
   const { data: applications = [], isLoading } = useQuery({
@@ -90,6 +91,7 @@ const InfluencerApplications = () => {
   }, [applications]);
 
   const handleWithdraw = async (id: string) => {
+    setWithdrawingId(id);
     try {
       const { error } = await supabase
         .from("campaign_applications")
@@ -99,6 +101,8 @@ const InfluencerApplications = () => {
       if (error) throw error;
     } catch (error) {
       console.error("Error withdrawing application:", error);
+    } finally {
+      setWithdrawingId(null);
     }
   };
 
@@ -194,7 +198,9 @@ const InfluencerApplications = () => {
                                     size="sm"
                                     className="text-red-600 hover:text-red-700 hover:bg-red-50"
                                     onClick={() => handleWithdraw(app.id)}
+                                    disabled={withdrawingId === app.id}
                                   >
+                                    {withdrawingId === app.id ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
                                     Withdraw
                                   </Button>
                                 )}

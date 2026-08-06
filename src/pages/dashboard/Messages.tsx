@@ -44,7 +44,7 @@ const Messages = ({ userType = "influencer" }: MessagesProps) => {
       return messageService.getConversations(user.id);
     },
     enabled: !!user,
-    refetchInterval: 10000, // Poll every 10 seconds as a fallback
+    refetchInterval: 60000, // Poll every 60 seconds as a fallback, rely mainly on real-time
   });
 
   // Real-time subscription
@@ -56,7 +56,7 @@ const Messages = ({ userType = "influencer" }: MessagesProps) => {
     };
 
     const channel = supabase
-      .channel('messages-changes')
+      .channel(`messages-changes-${user.id}`)
       .on(
         'postgres_changes',
         {

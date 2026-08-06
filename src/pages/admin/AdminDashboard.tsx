@@ -4,9 +4,9 @@ import { motion } from "framer-motion";
 import { Users, Briefcase, DollarSign, TrendingUp, UserCheck, UserX, FileText, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { dashboardService, applicationService, adminService } from "@/services/api";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -14,6 +14,8 @@ import { supabase } from "@/lib/supabase";
 
 const AdminDashboard = () => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [loadingAction, setLoadingAction] = useState<string | null>(null);
 
   // Fetch Dashboard Stats
   const { data: stats, isLoading: isLoadingStats, refetch: refetchStats } = useQuery({
@@ -69,13 +71,18 @@ const AdminDashboard = () => {
   const recentActivity = transactionsData?.data || [];
 
   const handleReviewApplication = async (appId: string, status: 'approved' | 'rejected') => {
+    if (!user) return;
+    setLoadingAction(`${appId}_${status}`);
     try {
-      await applicationService.reviewApplication(appId, status, user!.id);
+      await applicationService.reviewApplication(appId, status, user.id);
       toast.success(`Application ${status}`);
-      // refetch is handled by subscription
+      queryClient.invalidateQueries({ queryKey: ['pendingApplications'] });
+      queryClient.invalidateQueries({ queryKey: ['adminStats'] });
     } catch (error) {
-      toast.error("Failed to review application");
       console.error(error);
+      toast.error("Failed to update application");
+    } finally {
+      setLoadingAction(null);
     }
   };
 
@@ -198,12 +205,12 @@ const AdminDashboard = () => {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Button size="sm" variant="outline" onClick={() => handleReviewApplication(app.id, 'rejected')}>
-                            <UserX className="w-4 h-4 mr-1" />
+                          <Button size="sm" variant="outline" onClick={() => handleReviewApplication(app.id, 'rejected')} disabled={!!loadingAction}>
+                            {loadingAction === `${app.id}_rejected` ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <UserX className="w-4 h-4 mr-1" />}
                             Reject
                           </Button>
-                          <Button size="sm" variant="coral" onClick={() => handleReviewApplication(app.id, 'approved')}>
-                            <UserCheck className="w-4 h-4 mr-1" />
+                          <Button size="sm" variant="coral" onClick={() => handleReviewApplication(app.id, 'approved')} disabled={!!loadingAction}>
+                            {loadingAction === `${app.id}_approved` ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <UserCheck className="w-4 h-4 mr-1" />}
                             Approve
                           </Button>
                         </div>

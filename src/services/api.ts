@@ -36,6 +36,7 @@ import type {
     CampaignCategory,
     InfluencerCategory,
     MatchingCampaign,
+    MatchingInfluencer,
     CategoryStats,
     InfluencerDashboardStats,
     BrandDashboardStats,
@@ -318,6 +319,33 @@ export const campaignService = {
 
         if (error) throw error;
         return data;
+    },
+
+    async getMatchingInfluencers(campaignId: string, limit: number = 50): Promise<MatchingInfluencer[]> {
+        const { data, error } = await supabase.rpc('get_matching_influencers', {
+            p_campaign_id: campaignId,
+            p_limit: limit
+        });
+
+        if (error) throw error;
+        return (data as MatchingInfluencer[]) || [];
+    },
+
+    async triggerAutoMatching(campaignId: string, brandId: string, title: string): Promise<number> {
+        // Use SECURITY DEFINER RPC to bypass RLS — brands can't INSERT
+        // into campaign_matches or notifications directly.
+        const { data, error } = await supabase.rpc('auto_match_campaign', {
+            p_campaign_id: campaignId,
+            p_brand_id: brandId,
+            p_title: title,
+            p_limit: 50,
+        });
+
+        if (error) {
+            console.error('Auto-matching RPC failed:', error);
+            return 0;
+        }
+        return (data as number) || 0;
     },
 
     async deleteCampaign(id: string): Promise<void> {
@@ -1409,14 +1437,41 @@ export const categoryService = {
         return data || [];
     },
 
-    async setCampaignCategories(campaignId: string, categoryIds: string[]): Promise<void> {
-        // Delete existing associations
-        const { error: deleteError } = await supabase
-            .from('campaign_categories')
-            .delete()
-            .eq('campaign_id', campaignId);
+    /** Batch-fetch categories for multiple campaigns in a single query. */
+    async getCampaignCategoriesBatch(
+        campaignIds: string[]
+    ): Promise<Record<string, Category[]>> {
+        if (campaignIds.length === 0) return {};
 
-        if (deleteError) throw deleteError;
+        const { data, error } = await supabase
+            .from('campaign_categories')
+            .select('campaign_id, category:categories(*)')
+            .in('campaign_id', campaignIds);
+
+        if (error) {
+            console.warn('Batch campaign categories fetch failed:', error);
+            return {};
+        }
+
+        const result: Record<string, Category[]> = {};
+        for (const row of (data || []) as any[]) {
+            const cid = row.campaign_id as string;
+            if (!result[cid]) result[cid] = [];
+            if (row.category) result[cid].push(row.category as Category);
+        }
+        return result;
+    },
+
+    async setCampaignCategories(campaignId: string, categoryIds: string[], isNew: boolean = false): Promise<void> {
+        // Delete existing associations only if not a new campaign
+        if (!isNew) {
+            const { error: deleteError } = await supabase
+                .from('campaign_categories')
+                .delete()
+                .eq('campaign_id', campaignId);
+
+            if (deleteError) throw deleteError;
+        }
 
         // Insert new associations
         if (categoryIds.length > 0) {

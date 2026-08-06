@@ -7,11 +7,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { matchService } from "@/services/api";
 import { CampaignMatch, Campaign, BrandProfile } from "@/types/database.types";
 import { formatCurrency } from "@/lib/utils";
+import { useToast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
 
 // Extended type to include joined data
@@ -31,8 +33,9 @@ const statusConfig: Record<string, { color: string; bg: string; icon: typeof Clo
 };
 
 const InfluencerDeals = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: deals = [], isLoading } = useQuery({
     queryKey: ["influencer-deals", user?.id],
@@ -89,6 +92,34 @@ const InfluencerDeals = () => {
       pending: deals.filter(d => ["proposed", "accepted"].includes(d.status)).length,
     };
   }, [deals]);
+
+  const respondMutation = useMutation({
+    mutationFn: async ({ matchId, status, brandId, campaignTitle }: { matchId: string, status: 'accepted' | 'rejected', brandId: string, campaignTitle: string }) => {
+      await matchService.updateMatchStatus(matchId, status);
+      // Notify brand
+      await supabase.from('notifications').insert({
+        user_id: brandId,
+        type: 'match',
+        title: status === 'accepted' ? 'Invitation Accepted' : 'Invitation Declined',
+        message: `${profile?.full_name || 'An influencer'} has ${status} your invitation for "${campaignTitle}".`,
+        action_url: `/dashboard/influencers`,
+      });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["influencer-deals", user?.id] });
+      toast({
+        title: variables.status === 'accepted' ? "Invitation Accepted" : "Invitation Declined",
+        description: variables.status === 'accepted' ? "The campaign has been added to your active deals." : "The invitation has been removed.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to respond to invitation.",
+      });
+    }
+  });
 
   if (isLoading) {
     return (
@@ -187,9 +218,32 @@ const InfluencerDeals = () => {
                           </div>
                         )}
                       </div>
-                      <Button variant="outline" size="sm" asChild>
-                        <Link to={`/dashboard/campaigns/${deal.campaign.id}`}>View Details</Link>
-                      </Button>
+                      <div className="flex flex-col gap-2">
+                        {deal.status === "proposed" ? (
+                          <>
+                            <Button 
+                              variant="coral" 
+                              size="sm" 
+                              onClick={() => respondMutation.mutate({ matchId: deal.id, status: 'accepted', brandId: deal.campaign.brand_id, campaignTitle: deal.campaign.title })}
+                              disabled={respondMutation.isPending}
+                            >
+                              Accept Campaign
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => respondMutation.mutate({ matchId: deal.id, status: 'rejected', brandId: deal.campaign.brand_id, campaignTitle: deal.campaign.title })}
+                              disabled={respondMutation.isPending}
+                            >
+                              Decline
+                            </Button>
+                          </>
+                        ) : (
+                          <Button variant="outline" size="sm" asChild>
+                            <Link to={`/dashboard/campaigns/${deal.campaign.id}`}>View Details</Link>
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

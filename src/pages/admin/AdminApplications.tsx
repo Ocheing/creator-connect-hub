@@ -24,6 +24,7 @@ const statusColors: Record<string, string> = {
 const AdminApplications = () => {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
+  const [loadingAction, setLoadingAction] = useState<string | null>(null);
 
   const { data: rawApplications, isLoading, refetch } = useQuery({
     queryKey: ['adminApplications'],
@@ -51,12 +52,15 @@ const AdminApplications = () => {
 
   const handleReviewApplication = async (appId: string, status: 'approved' | 'rejected') => {
     if (!user) return;
+    setLoadingAction(`${appId}_${status}`);
     try {
       await applicationService.reviewApplication(appId, status, user.id);
       toast.success(`Application ${status}`);
     } catch (error) {
       console.error(error);
       toast.error("Failed to update application");
+    } finally {
+      setLoadingAction(null);
     }
   };
 
@@ -156,18 +160,18 @@ const AdminApplications = () => {
                               </div>
                             </div>
                             <div className="flex flex-col gap-2 shrink-0">
-                              {app.status === "pending" && (
-                                <>
-                                  <Button size="sm" variant="coral" onClick={() => handleReviewApplication(app.id, 'approved')}>
-                                    <UserCheck className="w-4 h-4 mr-1" />
-                                    Approve
-                                  </Button>
-                                  <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleReviewApplication(app.id, 'rejected')}>
-                                    <UserX className="w-4 h-4 mr-1" />
-                                    Reject
-                                  </Button>
-                                </>
-                              )}
+                                {app.status === 'pending' && (
+                                  <div className="flex gap-2 mt-3">
+                                    <Button size="sm" variant="coral" onClick={() => handleReviewApplication(app.id, 'approved')} disabled={!!loadingAction}>
+                                      {loadingAction === `${app.id}_approved` ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <UserCheck className="w-4 h-4 mr-1" />}
+                                      Approve
+                                    </Button>
+                                    <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleReviewApplication(app.id, 'rejected')} disabled={!!loadingAction}>
+                                      {loadingAction === `${app.id}_rejected` ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <UserX className="w-4 h-4 mr-1" />}
+                                      Reject
+                                    </Button>
+                                  </div>
+                                )}
                               <Button size="sm" variant="ghost">
                                 <ExternalLink className="w-4 h-4 mr-1" />
                                 View Profile

@@ -43,14 +43,21 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     }
 
     // Check role-based access
-    if (allowedRoles && profile && !allowedRoles.includes(profile.role)) {
-        // Redirect to role-appropriate dashboard
-        const roleRedirectMap: Record<UserRole, string> = {
-            influencer: '/dashboard',
-            brand: '/dashboard/brand',
-            admin: '/admin',
-        };
-        return <Navigate to={roleRedirectMap[profile.role] || '/'} replace />;
+    if (allowedRoles) {
+        if (!profile) {
+            // If we require specific roles but profile failed to load, deny access
+            return <Navigate to="/" replace />;
+        }
+        
+        if (!allowedRoles.includes(profile.role)) {
+            // Redirect to role-appropriate dashboard
+            const roleRedirectMap: Record<UserRole, string> = {
+                influencer: '/dashboard',
+                brand: '/dashboard/brand',
+                admin: '/admin',
+            };
+            return <Navigate to={roleRedirectMap[profile.role] || '/'} replace />;
+        }
     }
 
     return <>{children}</>;

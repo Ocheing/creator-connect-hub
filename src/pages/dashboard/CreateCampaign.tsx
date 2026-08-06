@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { motion } from "framer-motion";
 import {
@@ -22,7 +22,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { campaignService, categoryService } from "@/services/api";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate, Link } from "react-router-dom";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import CategorySelector from "@/components/categories/CategorySelector";
 import type { SocialPlatform } from "@/types/database.types";
 
@@ -61,6 +61,20 @@ const CreateCampaign = () => {
         targetEngagementMin: "2",
     });
 
+    // Functional updater helper to avoid stale closure bugs
+    const updateField = useCallback(
+        (field: keyof typeof form, value: string) =>
+            setForm((prev) => ({ ...prev, [field]: value })),
+        []
+    );
+
+    // Fetch categories for review step name resolution
+    const { data: allCategories = [] } = useQuery({
+        queryKey: ["categories"],
+        queryFn: () => categoryService.getCategories(true),
+        staleTime: 5 * 60 * 1000,
+    });
+
     const togglePlatform = (platform: SocialPlatform) => {
         setSelectedPlatforms((prev) =>
             prev.includes(platform)
@@ -70,10 +84,10 @@ const CreateCampaign = () => {
     };
 
     const mutation = useMutation({
-        mutationFn: async () => {
+        mutationFn: async (publishImmediate: boolean = false) => {
             if (!user) throw new Error("Not authenticated");
 
-            // 1. Create the campaign
+            // 1. Always create as 'draft' — RLS enforces status='draft' on INSERT
             const campaign = await campaignService.createCampaign({
                 brand_id: user.id,
                 title: form.title,
@@ -90,7 +104,7 @@ const CreateCampaign = () => {
                 budget: parseFloat(form.budget) || 0,
                 cost_per_influencer: parseFloat(form.costPerInfluencer) || 0,
                 max_influencers: parseInt(form.maxInfluencers) || 5,
-                status: "draft",
+                status: "draft", // Always draft on INSERT
                 start_date: form.startDate || null,
                 end_date: form.endDate || null,
                 application_deadline: form.applicationDeadline || null,
@@ -100,18 +114,30 @@ const CreateCampaign = () => {
             if (selectedCategoryIds.length > 0) {
                 await categoryService.setCampaignCategories(
                     campaign.id,
-                    selectedCategoryIds
+                    selectedCategoryIds,
+                    true // isNew flag to skip deletion
                 );
             }
 
-            return campaign;
+            // 3. If publishing, update status to 'active' in a second call
+            if (publishImmediate) {
+                await campaignService.updateCampaign(campaign.id, { status: "active" });
+
+                // 4. Trigger auto-matching via SECURITY DEFINER RPC (non-blocking)
+                campaignService
+                    .triggerAutoMatching(campaign.id, user.id, campaign.title)
+                    .catch(console.error);
+            }
+
+            return { campaign, publishImmediate };
         },
-        onSuccess: () => {
+        onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ["brandCampaignsAll"] });
             toast({
-                title: "Campaign Created!",
-                description:
-                    "Your campaign has been saved as a draft. You can publish it from the campaigns page.",
+                title: data.publishImmediate ? "Campaign Published!" : "Campaign Created!",
+                description: data.publishImmediate
+                    ? "Your campaign is now active and invitations have been sent to matching influencers."
+                    : "Your campaign has been saved as a draft. You can publish it from the campaigns page.",
             });
             navigate("/dashboard/campaigns");
         },
@@ -124,7 +150,10 @@ const CreateCampaign = () => {
         },
     });
 
-    const handleSubmit = () => {
+    const handleSubmit = (publishImmediate: boolean = false) => {
+        // Guard: prevent duplicate submissions from double-clicks
+        if (mutation.isPending) return;
+
         if (!form.title.trim()) {
             toast({
                 variant: "destructive",
@@ -149,7 +178,25 @@ const CreateCampaign = () => {
             });
             return;
         }
-        mutation.mutate();
+        // Date validation: end date must be after start date
+        if (form.startDate && form.endDate && form.endDate < form.startDate) {
+            toast({
+                variant: "destructive",
+                title: "Invalid Dates",
+                description: "End date must be on or after the start date.",
+            });
+            return;
+        }
+        // Date validation: application deadline must be on or before end date
+        if (form.applicationDeadline && form.endDate && form.applicationDeadline > form.endDate) {
+            toast({
+                variant: "destructive",
+                title: "Invalid Deadline",
+                description: "Application deadline must be on or before the campaign end date.",
+            });
+            return;
+        }
+        mutation.mutate(publishImmediate);
     };
 
     const canProceed = () => {
@@ -243,7 +290,7 @@ const CreateCampaign = () => {
                                         placeholder="e.g., Summer Fashion Collection Launch"
                                         value={form.title}
                                         onChange={(e) =>
-                                            setForm({ ...form, title: e.target.value })
+                                            updateField("title", e.target.value)
                                         }
                                     />
                                 </div>
@@ -256,7 +303,7 @@ const CreateCampaign = () => {
                                         rows={4}
                                         value={form.description}
                                         onChange={(e) =>
-                                            setForm({ ...form, description: e.target.value })
+                                            updateField("description", e.target.value)
                                         }
                                     />
                                 </div>
@@ -269,7 +316,7 @@ const CreateCampaign = () => {
                                         rows={3}
                                         value={form.requirements}
                                         onChange={(e) =>
-                                            setForm({ ...form, requirements: e.target.value })
+                                            updateField("requirements", e.target.value)
                                         }
                                     />
                                 </div>
@@ -284,7 +331,7 @@ const CreateCampaign = () => {
                                         rows={3}
                                         value={form.deliverables}
                                         onChange={(e) =>
-                                            setForm({ ...form, deliverables: e.target.value })
+                                            updateField("deliverables", e.target.value)
                                         }
                                     />
                                 </div>
@@ -382,7 +429,7 @@ const CreateCampaign = () => {
                                                 placeholder="50,000"
                                                 value={form.budget}
                                                 onChange={(e) =>
-                                                    setForm({ ...form, budget: e.target.value })
+                                                    updateField("budget", e.target.value)
                                                 }
                                             />
                                         </div>
@@ -401,10 +448,7 @@ const CreateCampaign = () => {
                                                 placeholder="10,000"
                                                 value={form.costPerInfluencer}
                                                 onChange={(e) =>
-                                                    setForm({
-                                                        ...form,
-                                                        costPerInfluencer: e.target.value,
-                                                    })
+                                                    updateField("costPerInfluencer", e.target.value)
                                                 }
                                             />
                                         </div>
@@ -423,7 +467,7 @@ const CreateCampaign = () => {
                                                 className="pl-9"
                                                 value={form.maxInfluencers}
                                                 onChange={(e) =>
-                                                    setForm({ ...form, maxInfluencers: e.target.value })
+                                                    updateField("maxInfluencers", e.target.value)
                                                 }
                                             />
                                         </div>
@@ -436,10 +480,7 @@ const CreateCampaign = () => {
                                             min="0"
                                             value={form.targetFollowersMin}
                                             onChange={(e) =>
-                                                setForm({
-                                                    ...form,
-                                                    targetFollowersMin: e.target.value,
-                                                })
+                                                updateField("targetFollowersMin", e.target.value)
                                             }
                                         />
                                     </div>
@@ -451,10 +492,7 @@ const CreateCampaign = () => {
                                             min="0"
                                             value={form.targetFollowersMax}
                                             onChange={(e) =>
-                                                setForm({
-                                                    ...form,
-                                                    targetFollowersMax: e.target.value,
-                                                })
+                                                updateField("targetFollowersMax", e.target.value)
                                             }
                                         />
                                     </div>
@@ -471,7 +509,7 @@ const CreateCampaign = () => {
                                             type="date"
                                             value={form.startDate}
                                             onChange={(e) =>
-                                                setForm({ ...form, startDate: e.target.value })
+                                                updateField("startDate", e.target.value)
                                             }
                                         />
                                     </div>
@@ -485,7 +523,7 @@ const CreateCampaign = () => {
                                             type="date"
                                             value={form.endDate}
                                             onChange={(e) =>
-                                                setForm({ ...form, endDate: e.target.value })
+                                                updateField("endDate", e.target.value)
                                             }
                                         />
                                     </div>
@@ -499,10 +537,7 @@ const CreateCampaign = () => {
                                             type="date"
                                             value={form.applicationDeadline}
                                             onChange={(e) =>
-                                                setForm({
-                                                    ...form,
-                                                    applicationDeadline: e.target.value,
-                                                })
+                                                updateField("applicationDeadline", e.target.value)
                                             }
                                         />
                                     </div>
@@ -555,10 +590,17 @@ const CreateCampaign = () => {
                                     </p>
                                     <div className="flex flex-wrap gap-2">
                                         {selectedCategoryIds.length > 0 ? (
-                                            /* We'll show ids here; the CategorySelector was read-only */
-                                            <p className="text-sm">
-                                                {selectedCategoryIds.length} categories selected
-                                            </p>
+                                            allCategories
+                                                .filter((c) => selectedCategoryIds.includes(c.id))
+                                                .map((cat) => (
+                                                    <Badge
+                                                        key={cat.id}
+                                                        className="bg-coral/10 text-coral border-coral/20"
+                                                    >
+                                                        <Tag className="w-3 h-3 mr-1" />
+                                                        {cat.name}
+                                                    </Badge>
+                                                ))
                                         ) : (
                                             <p className="text-sm text-muted-foreground">
                                                 No categories selected
@@ -654,16 +696,28 @@ const CreateCampaign = () => {
                             Continue
                         </Button>
                     ) : (
-                        <Button
-                            variant="coral"
-                            onClick={handleSubmit}
-                            disabled={mutation.isPending}
-                        >
-                            {mutation.isPending ? (
-                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                            ) : null}
-                            Create Campaign
-                        </Button>
+                        <div className="flex gap-2">
+                            <Button
+                                variant="outline"
+                                onClick={() => handleSubmit(false)}
+                                disabled={mutation.isPending}
+                            >
+                                {mutation.isPending ? (
+                                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                ) : null}
+                                Save as Draft
+                            </Button>
+                            <Button
+                                variant="coral"
+                                onClick={() => handleSubmit(true)}
+                                disabled={mutation.isPending}
+                            >
+                                {mutation.isPending ? (
+                                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                ) : null}
+                                Publish & Find Influencers
+                            </Button>
+                        </div>
                     )}
                 </div>
             </div>
