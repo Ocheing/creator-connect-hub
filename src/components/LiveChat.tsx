@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MessageCircle, X, Send } from "lucide-react";
+import { MessageCircle, X, Send, Hand } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
@@ -54,7 +54,7 @@ const LiveChat = () => {
                 </div>
                 <div className="bg-card rounded-2xl rounded-tl-sm p-3 shadow-sm max-w-[80%]">
                   <p className="text-sm">
-                    Hi there! 👋 Welcome to MicroMatch. How can we help you today?
+                    Hi there! <Hand className="w-4 h-4 inline-block mx-1" /> Welcome to MicroMatch. How can we help you today?
                   </p>
                 </div>
               </div>

@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Play } from "lucide-react";
+import { ArrowRight, Play, Target } from "lucide-react";
 import { motion } from "framer-motion";
 import heroImage from "@/assets/hero-creators.png";
 
@@ -108,7 +108,7 @@ const HeroSection = () => {
             >
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-coral/10 flex items-center justify-center">
-                  <span className="text-2xl">🎯</span>
+                  <Target className="w-6 h-6 text-coral" />
                 </div>
                 <div>
                   <p className="font-heading font-semibold">8.5% Avg Engagement</p>

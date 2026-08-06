@@ -1,6 +1,6 @@
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { motion } from "framer-motion";
-import { DollarSign, Briefcase, TrendingUp, Clock, ArrowUpRight, ArrowDownRight, Loader2 } from "lucide-react";
+import { DollarSign, Briefcase, TrendingUp, Clock, ArrowUpRight, ArrowDownRight, Loader2, Hand, Check, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -82,7 +82,7 @@ const InfluencerDashboard = () => {
             <div className="space-y-8">
                 {/* Header */}
                 <div>
-                    <h1 className="text-3xl font-heading font-bold mb-2">Welcome back, {profile?.full_name?.split(' ')[0] || 'Creator'}! 👋</h1>
+                    <h1 className="text-3xl font-heading font-bold mb-2 flex items-center gap-2">Welcome back, {profile?.full_name?.split(' ')[0] || 'Creator'}! <Hand className="w-8 h-8" /></h1>
                     <p className="text-muted-foreground">
                         Here's what's happening with your brand partnerships.
                     </p>
@@ -199,9 +199,9 @@ const InfluencerDashboard = () => {
                                             (influencerProfile?.niche?.length ?? 0) > 0 ? 'bg-green-100' : 'border-2 border-coral'
                                         }`}>
                                             {(influencerProfile?.niche?.length ?? 0) > 0 ? (
-                                                <span className="text-green-600 text-xs">✓</span>
+                                                <Check className="w-3 h-3 text-green-600" />
                                             ) : (
-                                                <span className="text-coral text-xs">!</span>
+                                                <AlertCircle className="w-3 h-3 text-coral" />
                                             )}
                                         </div>
                                         <span className={(influencerProfile?.niche?.length ?? 0) > 0 ? "text-muted-foreground" : ""}>
@@ -213,9 +213,9 @@ const InfluencerDashboard = () => {
                                             influencerProfile?.primary_platform ? 'bg-green-100' : 'border-2 border-coral'
                                         }`}>
                                             {influencerProfile?.primary_platform ? (
-                                                <span className="text-green-600 text-xs">✓</span>
+                                                <Check className="w-3 h-3 text-green-600" />
                                             ) : (
-                                                <span className="text-coral text-xs">!</span>
+                                                <AlertCircle className="w-3 h-3 text-coral" />
                                             )}
                                         </div>
                                         <span className={influencerProfile?.primary_platform ? "text-muted-foreground" : ""}>
@@ -227,9 +227,9 @@ const InfluencerDashboard = () => {
                                             (influencerProfile?.portfolio_urls?.length ?? 0) > 0 ? 'bg-green-100' : 'border-2 border-coral'
                                         }`}>
                                             {(influencerProfile?.portfolio_urls?.length ?? 0) > 0 ? (
-                                                <span className="text-green-600 text-xs">✓</span>
+                                                <Check className="w-3 h-3 text-green-600" />
                                             ) : (
-                                                <span className="text-coral text-xs">!</span>
+                                                <AlertCircle className="w-3 h-3 text-coral" />
                                             )}
                                         </div>
                                         <span className={(influencerProfile?.portfolio_urls?.length ?? 0) > 0 ? "text-muted-foreground" : ""}>

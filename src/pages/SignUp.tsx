@@ -5,10 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { motion } from "framer-motion";
-import { Sparkles, Eye, EyeOff, ArrowRight, Users, Building2 } from "lucide-react";
+import { Sparkles, Eye, EyeOff, ArrowRight, Users, Building2, Mail, Lock, User, UserPlus, PartyPopper, Check, X as XIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePlatformStats } from "@/hooks/usePlatformStats";
+import { supabase } from "@/lib/supabase";
 import type { UserRole } from "@/types/database.types";
 
 const SignUp = () => {
@@ -17,6 +18,7 @@ const SignUp = () => {
   const [role, setRole] = useState<UserRole>("influencer");
   const [formData, setFormData] = useState({
     name: "",
+    username: "",
     email: "",
     password: "",
     companyName: "",
@@ -26,13 +28,60 @@ const SignUp = () => {
   const { signUp } = useAuth();
   const { activeCreators, brandPartners } = usePlatformStats();
 
+  const isPasswordValid = {
+    length: formData.password.length >= 8,
+    uppercase: /[A-Z]/.test(formData.password),
+    lowercase: /[a-z]/.test(formData.password),
+    number: /[0-9]/.test(formData.password),
+    special: /[^A-Za-z0-9]/.test(formData.password),
+  };
+  const allPasswordValid = Object.values(isPasswordValid).every(Boolean);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!allPasswordValid) {
+      toast({
+        title: "Weak password",
+        description: "Please ensure your password meets all requirements.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
+      // 1. Check if email exists
+      const { data: emailExists, error: emailError } = await supabase.rpc('check_email_exists', { p_email: formData.email });
+      if (emailError) throw emailError;
+      if (emailExists) {
+        toast({
+          title: "Email in use",
+          description: "This email address is already registered. Please sign in or use a different email.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // 2. Check if username exists
+      const { data: usernameExists, error: usernameError } = await supabase.rpc('check_username_exists', { p_username: formData.username });
+      if (usernameError) throw usernameError;
+      if (usernameExists) {
+        toast({
+          title: "Username taken",
+          description: "This username is already taken. Please choose another one.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // 3. Proceed with sign up
       const { error } = await signUp({
         email: formData.email,
+        username: formData.username,
         password: formData.password,
         fullName: formData.name,
         role,
@@ -49,7 +98,11 @@ const SignUp = () => {
       }
 
       toast({
-        title: "Account created! 🎉",
+        title: (
+          <div className="flex items-center gap-2">
+            Account created! <PartyPopper className="w-4 h-4" />
+          </div>
+        ),
         description: "Please check your email to verify your account, then sign in.",
       });
       navigate("/sign-in");
@@ -147,6 +200,18 @@ const SignUp = () => {
               />
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                type="text"
+                placeholder="choose_a_username"
+                required
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              />
+            </div>
+
             {role === "brand" && (
               <div className="space-y-2">
                 <Label htmlFor="companyName">Company Name</Label>
@@ -181,7 +246,6 @@ const SignUp = () => {
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   required
-                  minLength={8}
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 />
@@ -197,9 +261,28 @@ const SignUp = () => {
                   )}
                 </button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Must be at least 8 characters
-              </p>
+              <div className="pt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2 text-xs text-muted-foreground">
+                <div className={`flex items-center gap-1.5 ${isPasswordValid.length ? "text-green-500" : ""}`}>
+                  {isPasswordValid.length ? <Check className="w-3 h-3" /> : <XIcon className="w-3 h-3 opacity-50" />}
+                  At least 8 characters
+                </div>
+                <div className={`flex items-center gap-1.5 ${isPasswordValid.uppercase ? "text-green-500" : ""}`}>
+                  {isPasswordValid.uppercase ? <Check className="w-3 h-3" /> : <XIcon className="w-3 h-3 opacity-50" />}
+                  One uppercase letter
+                </div>
+                <div className={`flex items-center gap-1.5 ${isPasswordValid.lowercase ? "text-green-500" : ""}`}>
+                  {isPasswordValid.lowercase ? <Check className="w-3 h-3" /> : <XIcon className="w-3 h-3 opacity-50" />}
+                  One lowercase letter
+                </div>
+                <div className={`flex items-center gap-1.5 ${isPasswordValid.number ? "text-green-500" : ""}`}>
+                  {isPasswordValid.number ? <Check className="w-3 h-3" /> : <XIcon className="w-3 h-3 opacity-50" />}
+                  One number
+                </div>
+                <div className={`flex items-center gap-1.5 ${isPasswordValid.special ? "text-green-500" : ""}`}>
+                  {isPasswordValid.special ? <Check className="w-3 h-3" /> : <XIcon className="w-3 h-3 opacity-50" />}
+                  One special character
+                </div>
+              </div>
             </div>
 
             <Button
@@ -207,7 +290,7 @@ const SignUp = () => {
               variant="coral"
               size="lg"
               className="w-full"
-              disabled={isLoading}
+              disabled={isLoading || !allPasswordValid}
             >
               {isLoading ? "Creating account..." : "Create Account"}
               {!isLoading && <ArrowRight className="w-4 h-4 ml-2" />}

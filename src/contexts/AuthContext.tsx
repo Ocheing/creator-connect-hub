@@ -17,6 +17,7 @@ interface AuthState {
 
 interface SignUpParams {
     email: string;
+    username: string;
     password: string;
     fullName: string;
     role: UserRole;
@@ -227,12 +228,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // ──────── Auth Actions ────────
 
-    const signUp = async ({ email, password, fullName, role, companyName }: SignUpParams) => {
+    const signUp = async ({ email, username, password, fullName, role, companyName }: SignUpParams) => {
         const { error } = await supabase.auth.signUp({
             email,
             password,
             options: {
                 data: {
+                    username,
                     full_name: fullName,
                     role,
                     company_name: companyName,
@@ -245,8 +247,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const signIn = async ({ email, password }: SignInParams) => {
+        let loginEmail = email;
+
+        // If it's not an email (no @), assume it's a username and look up the email
+        if (!email.includes('@')) {
+            const { data, error: rpcError } = await supabase
+                .rpc('get_email_by_username', { p_username: email });
+
+            if (rpcError) {
+                console.error("Error looking up username:", rpcError);
+                return { error: new Error("Invalid username or password") as AuthError };
+            }
+
+            if (!data) {
+                return { error: new Error("Invalid username or password") as AuthError };
+            }
+
+            loginEmail = data;
+        }
+
         const { error } = await supabase.auth.signInWithPassword({
-            email,
+            email: loginEmail,
             password,
         });
 

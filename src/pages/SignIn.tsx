@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { motion } from "framer-motion";
-import { Sparkles, Eye, EyeOff, ArrowRight, LogIn } from "lucide-react";
+import { Sparkles, Eye, EyeOff, ArrowRight, LogIn, Hand, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -47,7 +47,11 @@ const SignIn = () => {
       }
 
       toast({
-        title: "Welcome back! 👋",
+        title: (
+          <div className="flex items-center gap-2">
+            Welcome back! <Hand className="w-4 h-4" />
+          </div>
+        ),
         description: "You've been signed in successfully.",
       });
 
@@ -93,7 +97,11 @@ const SignIn = () => {
       }
 
       toast({
-        title: "Reset email sent! 📧",
+        title: (
+          <div className="flex items-center gap-2">
+            Reset email sent! <Mail className="w-4 h-4" />
+          </div>
+        ),
         description: "Check your inbox for the password reset link.",
       });
     } catch (err) {
@@ -153,11 +161,11 @@ const SignIn = () => {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">Email or Username</Label>
               <Input
                 id="email"
-                type="email"
-                placeholder="you@email.com"
+                type="text"
+                placeholder="you@email.com or username"
                 required
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
