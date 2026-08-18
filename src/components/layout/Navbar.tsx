@@ -26,7 +26,7 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-16 lg:h-20">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
-            <img src={logo} alt="MicroMatch" className="h-10 w-auto object-contain rounded-xl" />
+            <img src={logo} alt="MicroMatch" className="h-10 w-auto object-contain rounded-full" />
             <span className="font-heading font-bold text-xl text-foreground">
               Micro<span className="text-coral">Match</span>
             </span>

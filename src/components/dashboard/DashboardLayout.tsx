@@ -80,7 +80,7 @@ const DashboardLayout = ({ children, userType = "influencer" }: DashboardLayoutP
         {/* Logo */}
         <div className="h-16 flex items-center px-6 border-b border-border">
           <Link to="/" className="flex items-center gap-2">
-            <img src={logo} alt="MicroMatch" className="h-8 w-auto object-contain rounded-lg" />
+            <img src={logo} alt="MicroMatch" className="h-8 w-auto object-contain rounded-full" />
             <span className="font-heading font-bold text-lg">
               Micro<span className="text-coral">Match</span>
             </span>

@@ -73,7 +73,7 @@ const Footer = () => {
           {/* Brand Column */}
           <div className="col-span-2 md:col-span-3 lg:col-span-2">
             <Link to="/" className="flex items-center gap-2 mb-4">
-              <img src={logo} alt="MicroMatch" className="h-10 w-auto object-contain rounded-xl" />
+              <img src={logo} alt="MicroMatch" className="h-10 w-auto object-contain rounded-full" />
               <span className="font-heading font-bold text-xl">
                 Micro<span className="text-coral">Match</span>
               </span>
