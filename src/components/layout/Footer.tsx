@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Sparkles, Instagram, Twitter, Linkedin, Youtube, Mail } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import logo from "@/assets/micromatch.png";
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -72,9 +73,7 @@ const Footer = () => {
           {/* Brand Column */}
           <div className="col-span-2 md:col-span-3 lg:col-span-2">
             <Link to="/" className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-coral flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-primary-foreground" />
-              </div>
+              <img src={logo} alt="MicroMatch" className="h-10 w-auto object-contain rounded-xl" />
               <span className="font-heading font-bold text-xl">
                 Micro<span className="text-coral">Match</span>
               </span>

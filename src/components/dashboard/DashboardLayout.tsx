@@ -7,6 +7,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useState } from "react";
+import logo from "@/assets/micromatch.png";
 import { useQueryClient } from "@tanstack/react-query";
 
 interface DashboardLayoutProps {
@@ -79,9 +80,7 @@ const DashboardLayout = ({ children, userType = "influencer" }: DashboardLayoutP
         {/* Logo */}
         <div className="h-16 flex items-center px-6 border-b border-border">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-coral flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-primary-foreground" />
-            </div>
+            <img src={logo} alt="MicroMatch" className="h-8 w-auto object-contain rounded-lg" />
             <span className="font-heading font-bold text-lg">
               Micro<span className="text-coral">Match</span>
             </span>

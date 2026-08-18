@@ -24,7 +24,9 @@ const DashboardSettings = ({ userType: userTypeProp = "influencer" }: DashboardS
   const { user, profile, refreshProfile } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
+  const [isPasswordLoading, setIsPasswordLoading] = useState(false);
+  const [isPayoutLoading, setIsPayoutLoading] = useState(false);
 
   // Auto-detect the actual user type from profile role
   const userType = (profile?.role === "brand" ? "brand" : profile?.role === "influencer" ? "influencer" : userTypeProp) as "influencer" | "brand";
@@ -80,7 +82,8 @@ const DashboardSettings = ({ userType: userTypeProp = "influencer" }: DashboardS
 
   const handleProfileUpdate = async () => {
     if (!user) return;
-    setIsLoading(true);
+    if (isProfileLoading) return;
+    setIsProfileLoading(true);
     try {
       await profileService.updateProfile(user.id, {
         full_name: profileData.full_name,
@@ -101,7 +104,7 @@ const DashboardSettings = ({ userType: userTypeProp = "influencer" }: DashboardS
         description: (error instanceof Error ? error.message : "Failed to update profile."),
       });
     } finally {
-      setIsLoading(false);
+      setIsProfileLoading(false);
     }
   };
 
@@ -124,7 +127,7 @@ const DashboardSettings = ({ userType: userTypeProp = "influencer" }: DashboardS
       return;
     }
 
-    setIsLoading(true);
+    setIsPasswordLoading(true);
     try {
       // 1. Verify current password
       if (user?.email) {
@@ -158,13 +161,14 @@ const DashboardSettings = ({ userType: userTypeProp = "influencer" }: DashboardS
         description: (error instanceof Error ? error.message : "Failed to change password."),
       });
     } finally {
-      setIsLoading(false);
+      setIsPasswordLoading(false);
     }
   };
 
   const handlePayoutSave = async () => {
     if (!user) return;
-    setIsLoading(true);
+    if (isPayoutLoading) return;
+    setIsPayoutLoading(true);
     try {
       // Save to user metadata
       const { error } = await supabase.auth.updateUser({
@@ -184,7 +188,7 @@ const DashboardSettings = ({ userType: userTypeProp = "influencer" }: DashboardS
         description: (error instanceof Error ? error.message : "Failed to save payout settings."),
       });
     } finally {
-      setIsLoading(false);
+      setIsPayoutLoading(false);
     }
   };
 
@@ -271,8 +275,8 @@ const DashboardSettings = ({ userType: userTypeProp = "influencer" }: DashboardS
                       rows={3}
                     />
                   </div>
-                  <Button variant="coral" onClick={handleProfileUpdate} disabled={isLoading}>
-                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  <Button variant="coral" onClick={handleProfileUpdate} disabled={isProfileLoading}>
+                    {isProfileLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                     Save Changes
                   </Button>
                 </CardContent>
@@ -367,8 +371,8 @@ const DashboardSettings = ({ userType: userTypeProp = "influencer" }: DashboardS
                     </button>
                   </div>
                 </div>
-                <Button variant="coral" onClick={handlePasswordChange} disabled={isLoading || !passwordData.newPassword || !passwordData.currentPassword}>
-                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                <Button variant="coral" onClick={handlePasswordChange} disabled={isPasswordLoading || !passwordData.newPassword || !passwordData.currentPassword}>
+                  {isPasswordLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                   Update Password
                 </Button>
               </CardContent>
@@ -444,8 +448,8 @@ const DashboardSettings = ({ userType: userTypeProp = "influencer" }: DashboardS
                     </div>
                   )}
 
-                  <Button variant="coral" onClick={handlePayoutSave} disabled={isLoading}>
-                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  <Button variant="coral" onClick={handlePayoutSave} disabled={isPayoutLoading}>
+                    {isPayoutLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                     Save Payout Info
                   </Button>
                 </CardContent>
