@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Play, Target } from "lucide-react";
 import { motion } from "framer-motion";
-import heroImage from "@/assets/hero-creators.png";
+import heroImage from "@/assets/micromatchhero.jfif";
 
 import { usePlatformStats, useCountUp, formatStatValue } from "@/hooks/usePlatformStats";
 
