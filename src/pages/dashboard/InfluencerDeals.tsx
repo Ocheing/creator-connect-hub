@@ -221,17 +221,17 @@ const InfluencerDeals = () => {
                       <div className="flex flex-col gap-2">
                         {deal.status === "proposed" ? (
                           <>
-                            <Button 
-                              variant="coral" 
-                              size="sm" 
+                            <Button
+                              variant="coral"
+                              size="sm"
                               onClick={() => respondMutation.mutate({ matchId: deal.id, status: 'accepted', brandId: deal.campaign.brand_id, campaignTitle: deal.campaign.title })}
                               disabled={respondMutation.isPending}
                             >
                               Accept Campaign
                             </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
+                            <Button
+                              variant="outline"
+                              size="sm"
                               onClick={() => respondMutation.mutate({ matchId: deal.id, status: 'rejected', brandId: deal.campaign.brand_id, campaignTitle: deal.campaign.title })}
                               disabled={respondMutation.isPending}
                             >
